@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="utf-8"><title>Poker Minimal Client</title></head>
+<body>
+  <input id="name" placeholder="昵称" value="Player"/>
+  <button onclick="join()">加入</button>
+  <button onclick="send({type:'START'})">开始</button>
+  <button onclick="send({type:'ACTION',action:'CHECK'})">过牌</button>
+  <button onclick="send({type:'ACTION',action:'CALL'})">跟注</button>
+  <button onclick="send({type:'ACTION',action:'FOLD'})">弃牌</button>
+  <pre id="seats"></pre>
+  <pre id="log"></pre>
+<script>
+let ws, me;
+function join(){
+  ws = new WebSocket('ws://localhost:8080');
+  ws.onopen = () => send({type:'JOIN', name: document.getElementById('name').value, clientSeed: crypto.randomUUID()});
+  ws.onmessage = e => onMsg(JSON.parse(e.data));
+  ws.onclose = () => log('连接断开');
+}
+function send(msg){ ws && ws.send(JSON.stringify(msg)); }
+function onMsg(msg){
+  if (msg.type === 'JOINED') me = msg.you;
+  if (msg.type === 'ERROR') log('错误: ' + msg.message);
+  if (msg.seats) render(msg.seats);
+}
+function render(seats){
+  document.getElementById('seats').textContent = seats.map(s =>
+    `${s.name}${s.id===me?' (你)':''}  筹码:${s.chips}  下注:${s.betThisStreet}${s.folded?' [已弃牌]':''}`
+  ).join('\n');
+}
+function log(t){ document.getElementById('log').textContent += t + '\n'; }
+</script>
+</body>
+</html>

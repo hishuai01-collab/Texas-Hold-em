@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>德州扑克 · 前端联调</title>
+</head>
+<body>
+  <h2>德州扑克前端联调</h2>
+  <div id="status">连接中...</div>
+  <button onclick="joinGame()">加入牌局</button>
+  <button onclick="startGame()">开始游戏</button>
+
+  <script>
+    const socket = new WebSocket('ws://localhost:8080');
+
+    socket.onopen = () => document.getElementById('status').innerText = '已连接';
+    socket.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      console.log('收到后端推送:', msg);
+    };
+
+    function joinGame() {
+      socket.send(JSON.stringify({ type: 'JOIN', name: '玩家A', clientSeed: 'random123' }));
+    }
+
+    function startGame() {
+      socket.send(JSON.stringify({ type: 'START' }));
+    }
+  </script>
+</body>
+</html>

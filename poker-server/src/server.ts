@@ -31,6 +31,7 @@ const emit = (msg: ServerMsg, privateTo?: string): void => {
     }), 400);
   }
   const data = JSON.stringify(msg);
+  console.log(`[emit] ${msg.type}${privateTo ? ' → ' + privateTo.slice(0, 8) : ' (broadcast)'}`);
   if (privateTo) sockets.get(privateTo)?.send(data);
   else for (const ws of sockets.values()) if (ws.readyState === WebSocket.OPEN) ws.send(data);
 };
