@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>德州扑克 · 可验证公平 Demo</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --txt:#e6edf3; --dim:#8b949e;
+          --green:#3fb950; --red:#f85149; --gold:#d29922; --blue:#58a6ff; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.5 -apple-system,'PingFang SC',sans-serif; padding:16px; }
+  h3 { margin:0 0 8px; font-size:15px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  #table { flex:2; min-width:340px; }
+  #side { flex:1; min-width:280px; display:flex; flex-direction:column; gap:16px; }
+  .seat { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line);
+          border-radius:8px; margin-bottom:6px; }
+  .seat.me { border-color:var(--blue); }
+  .seat.folded { opacity:.4; }
+  .seat.acting { border-color:var(--gold); box-shadow:0 0 6px rgba(210,153,34,.4); }
+  .card { display:inline-flex; align-items:center; justify-content:center; width:34px; height:46px;
+          background:#fff; color:#111; border-radius:5px; font-weight:700; font-size:15px; }
+  .card.r { color:#c0392b; }
+  .card.back { background:repeating-linear-gradient(45deg,#1f6feb,#1f6feb 4px,#388bfd 4px,#388bfd 8px); }
+  .card .ok { position:relative; top:-16px; left:12px; font-size:10px; }
+  #board { display:flex; gap:6px; min-height:50px; margin:10px 0; }
+  #actions button { background:#21262d; color:var(--txt); border:1px solid var(--line);
+                    border-radius:6px; padding:8px 14px; margin:4px 4px 0 0; cursor:pointer; font-size:14px; }
+  #actions button:hover { border-color:var(--blue); }
+  #actions button:disabled { opacity:.35; cursor:default; }
+  #raiseAmt { width:80px; background:#0d1117; color:var(--txt); border:1px solid var(--line);
+              border-radius:6px; padding:8px; }
+  #log { max-height:180px; overflow-y:auto; font-size:12px; color:var(--dim); }
+  #verify { font-size:12px; }
+  #verify .v { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dashed var(--line); }
+  .ok { color:var(--green); } .bad { color:var(--red); } .gold { color:var(--gold); }
+  code { font-size:11px; color:var(--dim); word-break:break-all; }
+  .stat { color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="row">
+  <div id="table" class="panel">
+    <h3>牌桌 <span id="conn" class="stat">未连接</span></h3>
+    <div id="seats"></div>
+    <div class="stat">公共牌 · 彩池: <b id="pot" class="gold">0</b></div>
+    <div id="board"></div>
+    <div id="actions">
+      <button id="join">加入牌桌</button>
+      <button id="start" disabled>开始牌局</button>
+      <span id="play" style="display:none">
+        <button data-a="FOLD">弃牌</button>
+        <button data-a="CHECK">过牌</button>
+        <button data-a="CALL">跟注 <span id="toCall"></span></button>
+        <input id="raiseAmt" type="number" placeholder="加注到">
+        <button data-a="RAISE">加注</button>
+        <button data-a="ALL_IN">All-in</button>
+      </span>
+    </div>
+  </div>
+  <div id="side">
+    <div class="panel">
+      <h3>🔍 公平性验证面板</h3>
+      <div class="stat">牌堆承诺 deckRoot（开局锚定，逐张核对）:</div>
+      <code id="root">—</code>
+      <div id="verify"></div>
+      <div class="stat" style="margin-top:6px">审计 Merkle Root:</div>
+      <code id="audit">—</code>
+    </div>
+    <div class="panel"><h3>日志</h3><div id="log"></div></div>
+  </div>
+</div>
+
+<script>
+// ===================== 浏览器端验证 SDK（与服务端 DeckCommitment.verify 镜像）=====================
+const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('');
+const unhex = s => new Uint8Array(s.match(/../g).map(x => parseInt(x,16)));
+const sha256 = async bytes => new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+const concat = (...arrs) => { const t = new Uint8Array(arrs.reduce((s,a)=>s+a.length,0));
+  let o=0; for (const a of arrs){ t.set(a,o); o+=a.length; } return t; };
+
+async function verifyCard(reveal, rootHex) {
+  // leaf = SHA256( utf8(`${pos}:${card}:`) ‖ salt )
+  let h = await sha256(concat(new TextEncoder().encode(`${reveal.pos}:${reveal.card}:`), unhex(reveal.salt)));
+  for (const s of reveal.proof) {
+    const sib = unhex(s.hash);
+    // 内部节点域分离前缀 0x01
+    h = await sha256(concat(new Uint8Array([1]), s.left ? sib : h, s.left ? h : sib));
+  }
+  return hex(h) === rootHex;
+}
+
+// ===================== UI 状态（纯展示，逻辑全在服务端）=====================
+const $ = id => document.getElementById(id);
+let ws, myId = null, deckRoot = null, seats = [], actingId = null, myCards = [], boardCards = [];
+const SUIT = { s:'♠', h:'♥', d:'♦', c:'♣' };
+
+function cardEl(c, verified) {
+  const red = c[1] === 'h' || c[1] === 'd';
+  return `<span class="card ${red?'r':''}">${c[0]==='T'?'10':c[0]}${SUIT[c[1]]}${
+    verified===true?'<span class="ok">✓</span>':verified===false?'<span class="bad">✗</span>':''}</span>`;
+}
+
+function render() {
+  $('seats').innerHTML = seats.map(s => `
+    <div class="seat ${s.id===myId?'me':''} ${s.folded?'folded':''} ${s.id===actingId?'acting':''}">
+      <b>${s.name}</b><span class="stat">座位${s.seatIndex}</span>
+      <span>💰${s.chips}</span>
+      ${s.betThisStreet?`<span class="gold">下注 ${s.betThisStreet}</span>`:''}
+      ${s.allIn?'<span class="red">ALL-IN</span>':''}
+      ${s.id===myId? myCards.map(c=>cardEl(c.card, c.ok)).join('')
+        : s.reveals? s.reveals.map(c=>cardEl(c.card, c.ok)).join('')
+        : s.folded?'':'<span class="card back"></span><span class="card back"></span>'}
+    </div>`).join('');
+  $('board').innerHTML = boardCards.map(c=>cardEl(c.card, c.ok)).join('');
+}
+
+const log = (m, cls='') => { $('log').innerHTML = `<div class="${cls}">${m}</div>` + $('log').innerHTML; };
+const addVerify = (label, ok) => {
+  $('verify').innerHTML += `<div class="v"><span>${label}</span><span class="${ok?'ok':'bad'}">${ok?'✓ 已验证':'✗ 不一致!'}</span></div>`;
+};
+
+async function handleReveal(reveal, label) {
+  const ok = await verifyCard(reveal, deckRoot);
+  addVerify(`${label} ${reveal.card} @牌堆#${reveal.pos}`, ok);
+  if (!ok) log(`⚠️ ${label} 验证失败！服务端可能换牌`, 'bad');
+  return { card: reveal.card, ok };
+}
+
+// ===================== WebSocket =====================
+$('join').onclick = () => {
+  ws = new WebSocket(`ws://${location.hostname||'localhost'}:8090`);
+  const clientSeed = hex(crypto.getRandomValues(new Uint8Array(16)));
+  ws.onopen = () => {
+    $('conn').textContent = '已连接'; $('conn').className = 'ok';
+    ws.send(JSON.stringify({ type:'JOIN', name:'玩家'+Math.floor(Math.random()*100), clientSeed }));
+    log(`已提交 clientSeed: ${clientSeed.slice(0,16)}…（混入洗牌，服务端无法单方操控牌序）`);
+  };
+  ws.onclose = () => { $('conn').textContent = '已断开'; $('conn').className = 'bad'; };
+  ws.onmessage = async e => {
+    const m = JSON.parse(e.data);
+    switch (m.type) {
+      case 'JOINED': myId = m.you; seats = m.seats; $('join').disabled = true; $('start').disabled = false; render(); break;
+      case 'PLAYER_JOINED': seats = m.seats; render(); break;
+      case 'HAND_STARTED':
+        deckRoot = m.deckRoot; myCards = []; boardCards = []; actingId = null;
+        seats = m.seats; $('verify').innerHTML = ''; $('audit').textContent = '—';
+        $('root').textContent = deckRoot;
+        log(`🎲 新一手开始，deckRoot 已锚定（盲注 ${m.sb}/${m.bb}，按钮位 ${m.button}）`);
+        render(); break;
+      case 'PRIVATE_CARDS':
+        myCards = await Promise.all(m.reveals.map(r => handleReveal(r, '我的底牌')));
+        render(); break;
+      case 'ACTION_APPLIED':
+        seats = m.seats.map(s => ({...seats.find(o=>o.id===s.id), ...s}));
+        $('pot').textContent = m.pot;
+        log(`${seats.find(s=>s.id===m.playerId)?.name ?? '?'} → ${m.action}${m.amount?` (${m.amount})`:''}`);
+        render(); break;
+      case 'ACTION_REQUIRED':
+        actingId = m.playerId;
+        if (m.playerId === myId) {
+          $('play').style.display = 'inline';
+          $('toCall').textContent = m.toCall || '';
+          $('raiseAmt').value = m.minRaiseTo;
+        } else $('play').style.display = 'none';
+        render(); break;
+      case 'STREET': {
+        const vs = await Promise.all(m.reveals.map(r => handleReveal(r, m.street)));
+        boardCards.push(...vs); log(`🃏 ${m.street}: ${vs.map(v=>v.card).join(' ')}`); render(); break;
+      }
+      case 'REFUND':
+        log(`↩️ 未跟注退还 ${m.amount} 给 ${seats.find(s=>s.id===m.playerId)?.name}`); break;
+      case 'SHOWDOWN': {
+        for (const [pid, reveals] of Object.entries(m.reveals)) {
+          if (pid === myId) continue;
+          const vs = await Promise.all(reveals.map(r => handleReveal(r, `${seats.find(s=>s.id===pid)?.name}底牌`)));
+          const seat = m.seats.find(s=>s.id===pid); if (seat) seat.reveals = vs;
+        }
+        seats = m.seats.map(s => ({...seats.find(o=>o.id===s.id), ...s}));
+        m.pots.forEach((p,i)=>log(`池${i}（${p.amount}）资格: ${p.eligible.length}人`));
+        for (const [pid, won] of Object.entries(m.winnings))
+          if (won>0) log(`🏆 ${seats.find(s=>s.id===pid)?.name} 赢得 ${won}`, 'ok');
+        log(`（弃牌玩家底牌未揭示 —— Muck 规则）`);
+        $('play').style.display='none'; actingId=null; render(); break;
+      }
+      case 'HAND_ENDED':
+        $('audit').textContent = m.auditRoot;
+        log(`📜 本手审计 root 已下发（${m.eventCount} 个事件），服务端无法事后改历史`);
+        $('start').disabled = false; break;
+      case 'ERROR': log(`❌ ${m.message}`, 'bad'); break;
+    }
+  };
+};
+$('start').onclick = () => { ws.send(JSON.stringify({ type:'START' })); $('start').disabled = true; };
+document.querySelectorAll('#play button').forEach(b => b.onclick = () => {
+  ws.send(JSON.stringify({ type:'ACTION', action:b.dataset.a, amount:Number($('raiseAmt').value)||0 }));
+  $('play').style.display = 'none';
+});
+</script>
+</body>
+</html>
