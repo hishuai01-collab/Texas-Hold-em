@@ -51,3 +51,7 @@
 - 07-16 新增 client/index.html（simple-client 副本，供双击打开）。
 - 07-16 MVP 闭环验证通过：JOIN→START→ACTION_APPLIED 链路正常，无报错。
 - 07-16 澄清：frontend-demo 仅含 index.html/simple-client.html（大写事件协议），**无 App.vue/useGame.ts**；所谓小写 state 快照协议不存在，方案 A 无改造对象，无需改动。新建 Vue3 前端时按方案 A 直接基于后端事件协议写 useGame.ts。
+- 07-17 P0-1 清理：删 H5棋牌源码、棋牌-合并、根 frontend-demo(8090错配Vue)、poker-server/frontend-demo；统一到 client/index.html(8080)。
+- 07-17 P0-2 server.ts 加心跳：ExtWebSocket+isAlive、15s 全局 ping、pong 重置、close/error 清理 player。
+- 07-17 P0-3 补配置：tsconfig.json(ES2022/NodeNext)、package.json 加 build/start/dev、ecosystem.config.js(fork 单实例)。
+- 07-17 验证：npm run build 产出 dist/server.js；npm run start 跑通 JOIN→START→ACTION_APPLIED，安全日志正常；心跳逻辑就位。

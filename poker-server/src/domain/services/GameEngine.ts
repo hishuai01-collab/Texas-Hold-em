@@ -3,8 +3,9 @@ import type { Card } from '../model/types.js';
 import { deriveShuffleKey, shuffle } from './DeckShuffler.js';
 import { DeckCommitment, FULL_DECK } from './DeckCommitment.js';
 import { PotDistributor } from './PotDistributor.js';
+import { SidePotCalculator } from './SidePotCalculator.js';
 import { MerkleAuditTree } from '../../infrastructure/audit/MerkleAuditTree.js';
-import type { CardReveal, ServerMsg, SeatView } from '../../shared/protocol.js';
+import type { CardReveal, ReplayableServerMsg, ServerMsg, SeatView } from '../../shared/protocol.js';
 
 export interface EngineSeat {
   id: string;
@@ -42,12 +43,43 @@ export class GameEngine {
   private needAction = new Set<string>();
   handInProgress = false;
   private seq = 0;
+  /** 重连鉴权：playerId → 服务端签发的短期 reconnectToken（一次性，验证通过后立即轮换） */
+  private reconnectTokens = new Map<string, string>();
+  /** 重连重放：全手牌自增 seq 的广播事件历史 */
+  private replayLog: { seq: number; msg: ServerMsg }[] = [];
+  /** 重连重放：每个玩家的私有事件（PRIVATE_CARDS 等）按 playerId 归档，seq 取自共享序列 */
+  private replayPrivate = new Map<string, { seq: number; msg: ServerMsg }[]>();
 
   constructor(
     private readonly emit: Emit,
     public readonly sb = 5,
     public readonly bb = 10,
   ) {}
+
+  /** 当前轮到行动的玩家 id（用于 ACTION 防冒用） */
+  get activePlayer(): string | null {
+    const s = this.seats[this.actingPos];
+    return s && this.handInProgress && this.needAction.has(s.id) ? s.id : null;
+  }
+
+  /**
+   * 统一出口：给每条事件打自增 seq 并归档到重连日志，再广播/私发。
+   * ERROR 不进重放日志（瞬时错误，无需重建牌桌）。
+   */
+  private dispatch(msg: ReplayableServerMsg, privateTo?: string): void {
+    if (msg.type === 'ERROR') { this.emit(msg as ServerMsg); return; }
+
+    const seq = this.seq++;
+    const tagged = { ...msg, seq } as ServerMsg;
+    if (privateTo) {
+      const list = this.replayPrivate.get(privateTo) ?? [];
+      list.push({ seq, msg: tagged });
+      this.replayPrivate.set(privateTo, list);
+    } else {
+      this.replayLog.push({ seq, msg: tagged });
+    }
+    this.emit(tagged, privateTo);
+  }
 
   // ---------- 入座 ----------
   addPlayer(id: string, name: string, clientSeed: string, chips = 1000): void {
@@ -63,6 +95,7 @@ export class GameEngine {
 
   removePlayer(id: string): void {
     this.seats = this.seats.filter(s => s.id !== id);
+    this.reconnectTokens.delete(id);
   }
 
   views(): SeatView[] {
@@ -84,6 +117,8 @@ export class GameEngine {
     this.handInProgress = true;
     this.audit = new MerkleAuditTree();
     this.seq = 0;
+    this.replayLog = [];
+    this.replayPrivate.clear();
     this.board = [];
     this.dealt = 0;
     this.button = (this.button + 1) % this.seats.length;
@@ -100,7 +135,7 @@ export class GameEngine {
     const n = this.seats.length;
     const sbPos = n === 2 ? this.button : (this.button + 1) % n; // 单挑：按钮即小盲
     const bbPos = (sbPos + 1) % n;
-    this.emit({
+    this.dispatch({
       type: 'HAND_STARTED', handId, deckRoot,
       button: this.seats[this.button].seatIndex, sb: this.sb, bb: this.bb,
       seats: this.views(),
@@ -123,7 +158,7 @@ export class GameEngine {
       const pos = (sbPos + i) % n;
       const first = pos === sbPos ? 0 : (pos - sbPos + n) % n;
       const reveals = [this.commitment.reveal(first), this.commitment.reveal(first + n)];
-      this.emit({ type: 'PRIVATE_CARDS', reveals }, this.seats[pos].id);
+      this.dispatch({ type: 'PRIVATE_CARDS', reveals }, this.seats[pos].id);
     }
 
     this.street = 'PREFLOP';
@@ -166,9 +201,11 @@ export class GameEngine {
         break;
       }
       case 'RAISE': {
-        // amount = 加注到的总额（raise to）
+        // amount = 加注到的总额（raise to）。严格限制在 [minRaiseTo, 玩家最大可下注]，防筹码溢出
         const minTo = this.currentBet + this.minRaiseInc;
+        const maxTo = s.betThisStreet + s.chips; // 玩家全部筹码能加注到的最高总额
         if (amount < minTo) throw new Error(`最小加注到${minTo}`);
+        if (amount > maxTo) throw new Error(`最多加到${maxTo}`);
         const need = amount - s.betThisStreet;
         if (need >= s.chips) return this.act(playerId, 'ALL_IN');
         this.minRaiseInc = amount - this.currentBet;
@@ -193,13 +230,57 @@ export class GameEngine {
 
     this.needAction.delete(s.id);
     this.log({ event: 'ACTION', playerId, action, amount });
-    this.emit({
+    this.dispatch({
       type: 'ACTION_APPLIED', playerId, action,
       amount: s.betThisStreet,
       seats: this.views(),
       pot: this.seats.reduce((t, p) => t + p.contributed, 0),
     });
     this.advance();
+  }
+
+  /**
+   * 签发 reconnectToken：玩家 JOIN 成功时调用，生成有时效性的短期令牌。
+   * 当前为单实例内存态（用户已暂缓 Redis 持久化）；生产多实例时应下沉 Redis 并设置 EX 过期。
+   * 单次席位仅保留最新令牌，旧令牌自动失效。
+   */
+  issueReconnectToken(playerId: string): string {
+    const token = randomBytes(32).toString('hex');
+    this.reconnectTokens.set(playerId, token);
+    return token;
+  }
+
+  /**
+   * 重连身份校验（一次性令牌）：
+   * 仅当该 playerId 仍在桌上、且令牌与引擎侧一致时通过；验证成功后立即轮换新令牌，
+   * 旧令牌作废，防止重放攻击。
+   */
+  verifyAndRotateReconnect(playerId: string, token: string): boolean {
+    const seat = this.seats.find(s => s.id === playerId);
+    if (!seat) return false;
+    const expected = this.reconnectTokens.get(playerId);
+    if (!expected || expected !== token) return false;
+    // 一次性：成功后立即签发新令牌，旧令牌失效
+    this.reconnectTokens.set(playerId, randomBytes(32).toString('hex'));
+    return true;
+  }
+
+  /** 重连成功后取最新令牌回传前端（前端据此刷新本地凭证） */
+  currentReconnectToken(playerId: string): string | null {
+    return this.reconnectTokens.get(playerId) ?? null;
+  }
+
+  /**
+   * 生成断线重放事件：过滤 seq > lastSeq 的广播事件，并并入该玩家私有事件，
+   * 按 seq 升序一次性返回，前端据此重建牌桌。
+   */
+  getReplay(playerId: string, lastSeq: number): ServerMsg[] {
+    const priv = this.replayPrivate.get(playerId) ?? [];
+    const all = [...this.replayLog, ...priv]
+      .filter(e => e.seq > lastSeq)
+      .sort((a, b) => a.seq - b.seq)
+      .map(e => e.msg);
+    return all;
   }
 
   private pay(s: EngineSeat, amount: number): void {
@@ -222,7 +303,7 @@ export class GameEngine {
   // ---------- 推进 ----------
   private advance(): void {
     const active = this.seats.filter(p => !p.folded);
-    if (active.length === 1) return this.endHand(); // 全弃牌快速通道
+    if (active.length === 1) return this.settleHand(); // 全弃牌快速通道
 
     if (this.needAction.size === 0) return this.nextStreet();
 
@@ -243,7 +324,7 @@ export class GameEngine {
   private requestAction(): void {
     if (this.actingPos < 0) return this.nextStreet();
     const s = this.seats[this.actingPos];
-    this.emit({
+    this.dispatch({
       type: 'ACTION_REQUIRED', playerId: s.id,
       toCall: this.currentBet - s.betThisStreet,
       minRaiseTo: this.currentBet + this.minRaiseInc,
@@ -257,7 +338,7 @@ export class GameEngine {
 
     const order: Street[] = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
     const idx = order.indexOf(this.street);
-    if (this.street === 'RIVER') return this.endHand();
+    if (this.street === 'RIVER') return this.settleHand();
     this.street = order[idx + 1];
 
     const count = this.street === 'FLOP' ? 3 : 1;
@@ -268,7 +349,7 @@ export class GameEngine {
       reveals.push(this.commitment.reveal(pos));
     }
     this.log({ event: 'STREET', street: this.street, cards: reveals.map(r => r.card) });
-    this.emit({ type: 'STREET', street: this.street as 'FLOP' | 'TURN' | 'RIVER', reveals });
+      this.dispatch({ type: 'STREET', street: this.street as 'FLOP' | 'TURN' | 'RIVER', reveals });
 
     // 所有人都all-in（或只剩一个能动）→ 直接跑完剩余街
     this.resetNeedAction();
@@ -282,14 +363,15 @@ export class GameEngine {
   }
 
   // ---------- 结算 ----------
-  private endHand(): void {
-    const refund = PotDistributor.returnUncalled(this.seats);
+  /** Independently settle the main pot and every side pot after all contributions close. */
+  private settleHand(): void {
+    const refund = SidePotCalculator.returnUncalled(this.seats);
     if (refund) {
       this.log({ event: 'REFUND', ...refund });
-      this.emit({ type: 'REFUND', playerId: refund.playerId, amount: refund.refund });
+      this.dispatch({ type: 'REFUND', playerId: refund.playerId, amount: refund.refund });
     }
 
-    const pots = PotDistributor.buildPots(this.seats);
+    const pots = SidePotCalculator.calculate(this.seats);
     const winnings = PotDistributor.distribute(
       pots, this.seats, this.board,
       this.seats[this.button].seatIndex,
@@ -316,12 +398,12 @@ export class GameEngine {
     });
 
     this.log({ event: 'SHOWDOWN', winnings: Object.fromEntries(winnings) });
-    this.emit({
+    this.dispatch({
       type: 'SHOWDOWN', pots, reveals,
       winnings: Object.fromEntries(winnings),
       seats: this.views(),
     });
-    this.emit({ type: 'HAND_ENDED', auditRoot: this.audit.root().toString('hex'), eventCount: this.audit.size });
+    this.dispatch({ type: 'HAND_ENDED', auditRoot: this.audit.root().toString('hex'), eventCount: this.audit.size });
     this.handInProgress = false;
     this.street = 'DONE';
   }

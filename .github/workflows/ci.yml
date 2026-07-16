@@ -2,18 +2,34 @@ name: Poker CI
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm install
-        working-directory: ./poker-server
-      - name: Run Tests
-        run: npx tsx --test test/*.test.ts
-        working-directory: ./poker-server
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            poker-server/package-lock.json
+            client/package-lock.json
+
+      - name: Install & test server
+        working-directory: poker-server
+        run: |
+          npm ci
+          npm run test
+          npm run build
+
+      - name: Build client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build

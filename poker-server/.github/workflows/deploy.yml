@@ -1,0 +1,93 @@
+name: Deploy poker-server & client
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SERVER_HOST: ${{ secrets.PROD_HOST }}
+      SERVER_USER: ${{ secrets.PROD_USER }}
+      SSH_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+      KNOWN_HOSTS: ${{ secrets.ACTIONS_DEPLOY_KNOWN_HOSTS }}
+      REMOTE_BASE: /var/www
+      SERVER_PATH: ${{ env.REMOTE_BASE }}/poker-server
+      CLIENT_PATH: ${{ env.REMOTE_BASE }}/poker-client
+      LOG_DIR: /var/log/poker-server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            poker-server/package-lock.json
+            client/package-lock.json
+
+      - name: Install backend deps
+        working-directory: ./poker-server
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: ./poker-server
+        run: npm test
+
+      - name: Build backend
+        working-directory: ./poker-server
+        run: npm run build
+
+      - name: Install frontend deps
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./client
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ env.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync backend to server
+        run: |
+          rsync -avz --delete \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='dist' \
+            --exclude='test' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            ./poker-server/ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+
+      - name: Sync frontend dist to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            ./client/dist/ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.CLIENT_PATH }}/dist/
+
+      - name: Remote install & PM2 reload
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} bash -s << 'EOF'
+            set -euo pipefail
+
+            mkdir -p ${{ env.LOG_DIR }}
+
+            cd ${{ env.SERVER_PATH }}
+            npm ci --omit=dev
+
+            pm2 reload poker-server --update-env
+
+            echo "Deploy completed at $(date)"
+          EOF

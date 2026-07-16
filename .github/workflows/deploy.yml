@@ -1,0 +1,154 @@
+name: Build and Deploy Poker (production)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+# 同一生产环境串行执行，避免重叠部署互相 reload 导致抖动
+concurrency:
+  group: poker-production
+  cancel-in-progress: false
+
+# 最小权限原则：仅读取仓库内容
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  REMOTE_DIR: /var/www/poker-server
+  CLIENT_DIR: /var/www/poker-client
+  LOG_DIR: /var/log/poker-server
+  PM2_APP: poker-server
+
+jobs:
+  build:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            poker-server/package-lock.json
+            client/package-lock.json
+
+      - name: Test & build server
+        working-directory: poker-server
+        run: |
+          npm ci
+          npm run test
+          npm run build --if-present
+          test -f dist/server.js || { echo "::error::server build missing dist/server.js"; exit 1; }
+
+      - name: Build Vite client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build --if-present
+          test -f dist/index.html || { echo "::error::client build missing dist/index.html"; exit 1; }
+
+      # 仅传递编译产物与运行所需清单，避免源码/测试进入服务器
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            poker-server/dist/
+            poker-server/package.json
+            poker-server/package-lock.json
+            poker-server/ecosystem.config.js
+            client/dist/
+          retention-days: 7
+
+  deploy:
+    name: Deploy & Reload
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out source (for deploy scripts/paths)
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+
+      - name: Configure production SSH access
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ACTIONS_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY" || { echo "::error::Missing ACTIONS_DEPLOY_KEY"; exit 1; }
+          test -n "$SSH_KNOWN_HOSTS" || { echo "::error::Missing ACTIONS_DEPLOY_KNOWN_HOSTS"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release artifacts (rsync incremental)
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          set -eu
+          rsync -az --delay-updates --delete "release/client/dist/" "$PROD_USER@$PROD_HOST:$CLIENT_DIR/dist/"
+          rsync -az --delay-updates --delete "release/poker-server/dist/" "$PROD_USER@$PROD_HOST:$REMOTE_DIR/dist/"
+          rsync -az \
+            "release/poker-server/package.json" \
+            "release/poker-server/package-lock.json" \
+            "release/poker-server/ecosystem.config.js" \
+            "$PROD_USER@$PROD_HOST:$REMOTE_DIR/"
+
+      - name: Install deps & reload PM2 (zero-downtime)
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          set -eu
+          ssh "$PROD_USER@$PROD_HOST" 'set -eu
+            mkdir -p '"$LOG_DIR"'
+            cd '"$REMOTE_DIR"'
+            npm ci --omit=dev
+
+            # 日志轮转预检：缺失才安装，安装或加载失败即中止部署。
+            command -v pm2 >/dev/null 2>&1 || { echo "::error::pm2 is not installed"; exit 1; }
+            if ! pm2 describe pm2-logrotate >/dev/null 2>&1; then
+              pm2 install pm2-logrotate
+            fi
+            pm2 describe pm2-logrotate >/dev/null 2>&1 || { echo "::error::pm2-logrotate unavailable"; exit 1; }
+            pm2 set pm2-logrotate:max_size 10M
+            pm2 set pm2-logrotate:retain 14
+            pm2 set pm2-logrotate:compress true
+            pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm-ss
+
+            # 首次部署启动，后续平滑重载（已存在则 reload）
+            if pm2 describe '"$PM2_APP"' >/dev/null 2>&1; then
+              pm2 reload '"$PM2_APP"' --update-env
+            else
+              pm2 start ecosystem.config.js --only '"$PM2_APP"'
+              pm2 save
+            fi'
+
+      - name: Health check
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          set -eu
+          ssh "$PROD_USER@$PROD_HOST" 'set -eu
+            pm2 describe '"$PM2_APP"' >/dev/null 2>&1 || { echo "::error::PM2 app not found"; exit 1; }
+            STATUS=$(pm2 jlist | node -e "let raw = \"\"; process.stdin.setEncoding(\"utf8\"); process.stdin.on(\"data\", chunk => raw += chunk); process.stdin.on(\"end\", () => { const app = JSON.parse(raw).find(item => item.name === process.argv[1]); if (!app) process.exit(2); process.stdout.write(app.pm2_env.status ?? \"unknown\"); });" '"$PM2_APP"')
+            if [ "$STATUS" != "online" ]; then echo "::error::app status=$STATUS (expected online)"; exit 1; fi
+            echo "health ok: '"$PM2_APP"' status=$STATUS"'
+          echo "deploy ok"

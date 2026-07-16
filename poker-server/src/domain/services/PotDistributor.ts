@@ -1,8 +1,6 @@
 import type { Card, Pot, Seat } from '../model/types.js';
 import { compareRank, evaluateBest } from './HandEvaluator.js';
-
-const sameSet = (a: string[], b: string[]) =>
-  a.length === b.length && a.every(x => b.includes(x));
+import { SidePotCalculator } from './SidePotCalculator.js';
 
 /** 按钮位顺时针距离（用于余数筹码的确定性分配） */
 const clockwiseDist = (from: number, to: number, tableSize: number) =>
@@ -14,14 +12,7 @@ export class PotDistributor {
    * 例：A 下注 500，B all-in 200 跟注 → A 拿回 300
    */
   static returnUncalled(seats: Seat[]): { playerId: string; refund: number } | null {
-    const byContrib = [...seats].sort((a, b) => b.contributed - a.contributed);
-    const top = byContrib[0];
-    const second = byContrib[1]?.contributed ?? 0;
-    if (!top || top.contributed <= second) return null;
-    const refund = top.contributed - second;
-    top.chips += refund;
-    top.contributed -= refund;
-    return { playerId: top.id, refund };
+    return SidePotCalculator.returnUncalled(seats);
   }
 
   /**
@@ -31,28 +22,7 @@ export class PotDistributor {
    * 资格集合相同的相邻层合并，避免碎池；支持任意层级边池
    */
   static buildPots(seats: Seat[]): Pot[] {
-    const contributors = seats.filter(s => s.contributed > 0);
-    const levels = [...new Set(contributors.map(s => s.contributed))].sort((a, b) => a - b);
-
-    const pots: Pot[] = [];
-    let prev = 0;
-    for (const level of levels) {
-      let amount = 0;
-      for (const s of contributors) {
-        amount += Math.max(0, Math.min(s.contributed, level) - prev);
-      }
-      const eligible = seats
-        .filter(s => !s.folded && s.contributed >= level)
-        .map(s => s.id);
-
-      if (amount > 0) {
-        const last = pots[pots.length - 1];
-        if (last && sameSet(last.eligible, eligible)) last.amount += amount;
-        else pots.push({ amount, eligible });
-      }
-      prev = level;
-    }
-    return pots;
+    return SidePotCalculator.calculate(seats);
   }
 
   /**
