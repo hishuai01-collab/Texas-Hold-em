@@ -13,5 +13,7 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
+        working-directory: ./poker-server
       - name: Run Tests
-        run: npx tsx --test poker-server/test/*.test.ts
+        run: npx tsx --test test/*.test.ts
+        working-directory: ./poker-server
