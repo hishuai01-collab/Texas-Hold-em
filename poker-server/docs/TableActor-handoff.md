@@ -55,3 +55,4 @@
 - 07-17 P0-2 server.ts 加心跳：ExtWebSocket+isAlive、15s 全局 ping、pong 重置、close/error 清理 player。
 - 07-17 P0-3 补配置：tsconfig.json(ES2022/NodeNext)、package.json 加 build/start/dev、ecosystem.config.js(fork 单实例)。
 - 07-17 验证：npm run build 产出 dist/server.js；npm run start 跑通 JOIN→START→ACTION_APPLIED，安全日志正常；心跳逻辑就位。
+- 07-17 安全风控竣工（Group C/D）：新增 `src/infrastructure/security/` 五件套——`IpBlocklist`(LRU+60s TTL+XFF，3 次违规 403 握手拒绝)、`ConnectionState`(CONNECTING→AUTHORIZING→CONNECTED，未授权拦截 ACTION)、`schema`(Zod 运行时强校验 Client/Server)、`ActionPrecheck`(结构化错误码 余额不足/非自己回合)、`ActionRiskControl`(HMAC 签名防篡改预留 Hook，ACTION_SIG_HOOK=1 开启)。server.ts 接入 verifyClient 403、网关违规记 IP 打击、Zod 校验、状态机闸、预校验、出站自检；ERROR 协议加 code 字段。测试 69 项全过。

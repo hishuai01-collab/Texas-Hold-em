@@ -16,14 +16,28 @@
 两个 `/var/www` 目录及 `/var/log/poker-server` 的写权限，并能运行 `pm2`：
 
 ```bash
-sudo mkdir -p /var/www/poker-server/dist /var/www/poker-client/dist /var/log/poker-server
-sudo chown -R deploy:deploy /var/www/poker-server /var/www/poker-client /var/log/poker-server
+sudo mkdir -p /var/www/poker-server/dist /var/www/poker-client/dist /var/log/poker-server /var/lib/poker-server /etc/poker-server
+sudo chown -R deploy:deploy /var/www/poker-server /var/www/poker-client /var/log/poker-server /var/lib/poker-server
+sudo sh -c 'printf "%s\\n" "REDIS_URL=redis://:replace-me@127.0.0.1:6379/0" > /etc/poker-server/env'
+sudo chown root:deploy /etc/poker-server/env
+sudo chmod 640 /etc/poker-server/env
 cd /var/www/poker-server
 npm ci --omit=dev
 pm2 start ecosystem.config.js --only poker-server
 pm2 save
 pm2 startup
 ```
+
+`/etc/poker-server/env` 是仅服务器保存的运行时密钥文件，必须包含 `REDIS_URL`；不要将它
+写入仓库或 GitHub Actions。生产进程拒绝在缺少 Redis 的情况下启动。重连令牌保存在
+`poker:reconnect:<token>`，TTL 固定为 300 秒，值包含 `{ playerId, tableId }`，并在一次成功
+重连后原子删除和轮换。
+
+Prometheus 只在本机 `127.0.0.1:9091/metrics` 暴露：`poker_online_tables`、
+`poker_active_connections`、`poker_abnormal_disconnects_total`、`poker_action_timeouts_total`。
+需要远程采集时应由本机 Prometheus 或受认证反代抓取，绝不直接对公网开放。PM2 发出
+`SIGTERM` 时服务会停收新连接、排空 Actor、关闭时钟并将加密边界内的牌桌快照写入
+`/var/lib/poker-server/table-snapshot.json`；该文件为机密状态，应限制为部署用户可读。
 
 安装 Nginx 后，将 `deploy/nginx.conf` 中的域名和证书路径替换为实际值，
 再启用并校验配置：

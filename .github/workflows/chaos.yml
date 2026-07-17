@@ -1,0 +1,83 @@
+name: Poker Chaos (SIGKILL recovery)
+
+# 混沌工程门禁：把手工的 SIGKILL 崩溃恢复测试固化为流水线。
+# 仅在两种场景运行，避免每次 push 都跑重量级 E2E：
+#   1) 目标为 main 的 Pull Request —— 合并进 main 之前的守门校验；
+#   2) workflow_dispatch —— 需要时手动触发。
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# 最小权限：仅读取仓库内容
+permissions:
+  contents: read
+
+# 同一 PR 的新提交取消上一次仍在跑的混沌校验，节省 runner
+concurrency:
+  group: poker-chaos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chaos:
+    name: SIGKILL crash & recovery E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # 完整的 Redis Service：混沌测试依赖真实 Redis 承载 EventStore / 快照 / 表注册表，
+    # 崩溃后的恢复正是从这里的快照 + 事件流冷启动重建。健康检查确保连上后再跑测试。
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+      # 混沌测试会自行为每个被拉起的服务子进程分配独立端口（PORT/METRICS_PORT/HTTP_API_PORT），
+      # 这里的值仅作占位/兜底，不会与子进程实际监听端口冲突。
+      NODE_ENV: test
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: poker-server/package-lock.json
+
+      - name: Install server deps
+        working-directory: poker-server
+        run: npm ci
+
+      # 门禁前置：先确认服务器能编译，避免混沌测试因编译错误产生误导性的“恢复失败”。
+      - name: Type-check / build server
+        working-directory: poker-server
+        run: npm run build
+
+      - name: Wait for Redis to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if redis-cli -h 127.0.0.1 -p 6379 ping | grep -q PONG; then
+              echo "Redis is up"; exit 0
+            fi
+            echo "waiting for redis... ($i)"; sleep 1
+          done
+          echo "::error::Redis did not become ready in time"; exit 1
+
+      # 核心：启动真实服务 + Redis -> 虚拟客户端入桌打到一半 -> SIGKILL -> 重启 -> 校验恢复后筹码与状态快照。
+      # 测试脚本 test/e2e/chaos.test.ts 会为每个被拉起的服务子进程分配独立端口，未配置 REDIS_URL 时优雅跳过。
+      - name: Run chaos SIGKILL recovery E2E
+        working-directory: poker-server
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: npm run test:e2e

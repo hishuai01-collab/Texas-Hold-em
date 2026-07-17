@@ -4,6 +4,7 @@ import type { Card, Pot } from '../domain/model/types.js';
 // ---------- 客户端 → 服务端 ----------
 export type ClientPayload =
   | { type: 'JOIN'; name: string; clientSeed: string }
+  | { type: 'LEAVE' }
   | { type: 'START' }
   | { type: 'ACTION'; action: 'FOLD' | 'CHECK' | 'CALL' | 'RAISE' | 'ALL_IN'; amount?: number }
   // 断线重连：携带身份 + 服务端签发的短期 reconnectToken 做一次性鉴权，lastSeq 用于增量重放
@@ -41,14 +42,16 @@ export type ServerMsg =
   | { type: 'JOINED'; seq: number; you: string; reconnectToken: string; seats: SeatView[] }
   | { type: 'RECONNECTED'; seq: number; reconnectToken: string; seats: SeatView[] }
   | { type: 'PLAYER_JOINED'; seq: number; seats: SeatView[] }
+  | { type: 'PLAYER_LEFT'; seq: number; playerId: string; reason: 'LEFT' | 'BUSTED'; seats: SeatView[] }
   | { type: 'HAND_STARTED'; seq: number; handId: string; deckRoot: string; button: number; sb: number; bb: number; seats: SeatView[] }
   | { type: 'PRIVATE_CARDS'; seq: number; reveals: CardReveal[] }              // 仅发给本人
   | { type: 'ACTION_APPLIED'; seq: number; playerId: string; action: string; amount: number; seats: SeatView[]; pot: number }
-  | { type: 'ACTION_REQUIRED'; seq: number; playerId: string; toCall: number; minRaiseTo: number }
+  | { type: 'ACTION_REQUIRED'; seq: number; playerId: string; toCall: number; minRaiseTo: number; raiseAllowed: boolean }
   | { type: 'STREET'; seq: number; street: 'FLOP' | 'TURN' | 'RIVER'; reveals: CardReveal[] }
   | { type: 'REFUND'; seq: number; playerId: string; amount: number }
   | { type: 'SHOWDOWN'; seq: number; pots: Pot[]; reveals: Record<string, CardReveal[]>; winnings: Record<string, number>; seats: SeatView[] }
   | { type: 'HAND_ENDED'; seq: number; auditRoot: string; eventCount: number }
-  | { type: 'ERROR'; message: string }
+  // 结构化错误：code 为前端可识别的枚举错误码，message 为用户语言文案（绝不暴露后端字段/栈）
+  | { type: 'ERROR'; code?: string; message: string }
   // 断线重连：一次性重放 seq > lastSeq 的所有事件（含重连者私有事件）
   | { type: 'EVENT_REPLAY'; events: ServerMsg[] };

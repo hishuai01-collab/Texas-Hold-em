@@ -4,13 +4,13 @@ import type { SeatView } from '../types/protocol'
 
 const props = defineProps<{
   connected: boolean
-  request: { playerId: string; toCall: number; minRaiseTo: number } | null
+  request: { playerId: string; toCall: number; minRaiseTo: number; raiseAllowed: boolean } | null
   seat: SeatView | null
 }>()
 const emit = defineEmits<{ action: [action: 'FOLD' | 'CHECK' | 'CALL' | 'RAISE' | 'ALL_IN', amount?: number] }>()
 
 const maxRaiseTo = computed(() => props.seat ? props.seat.betThisStreet + props.seat.chips : 0)
-const canRaise = computed(() => Boolean(props.request && props.seat && props.request.minRaiseTo <= maxRaiseTo.value))
+const canRaise = computed(() => Boolean(props.request?.raiseAllowed && props.seat && props.request.minRaiseTo <= maxRaiseTo.value))
 const raiseTo = ref(0)
 watch([() => props.request?.minRaiseTo, maxRaiseTo], () => {
   raiseTo.value = canRaise.value && props.request ? props.request.minRaiseTo : maxRaiseTo.value

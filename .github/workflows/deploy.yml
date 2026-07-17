@@ -118,6 +118,11 @@ jobs:
           set -eu
           ssh "$PROD_USER@$PROD_HOST" 'set -eu
             mkdir -p '"$LOG_DIR"'
+            test -r /etc/poker-server/env || { echo "::error::missing /etc/poker-server/env (must contain REDIS_URL)"; exit 1; }
+            set -a
+            . /etc/poker-server/env
+            set +a
+            test -n "${REDIS_URL:-}" || { echo "::error::REDIS_URL missing from /etc/poker-server/env"; exit 1; }
             cd '"$REMOTE_DIR"'
             npm ci --omit=dev
 

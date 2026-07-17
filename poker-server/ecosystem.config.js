@@ -27,7 +27,9 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 1000,
       exp_backoff_restart_delay: 2000,
-      kill_timeout: 5000,
+      // SIGTERM drains every table's actor queue then writes a confidential
+      // per-table snapshot to Redis (poker:snapshot:{tableId}).
+      kill_timeout: 15000,
       kill_signal: 'SIGTERM',
       shutdown_with_message: true,
       listen_timeout: 10000,
@@ -41,6 +43,10 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 8080,
+        METRICS_PORT: 9091,
+        // Loaded from /etc/poker-server/env by the deploy workflow; never commit a Redis URL.
+        // Backs reconnect tokens, the table registry, and the event-sourced snapshot/stream store.
+        REDIS_URL: process.env.REDIS_URL,
       },
     },
   ],

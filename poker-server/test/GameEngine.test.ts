@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { GameEngine } from '../src/domain/services/GameEngine.js';
+import { HandState } from '../src/domain/model/HandState.js';
 
 const emitMap = new Map<string, any[]>();
 const makeEngine = () => {
@@ -168,4 +169,69 @@ test('非法动作：未知 action 抛错', () => {
     return b.filter(m => m.type === 'ACTION_REQUIRED').pop();
   })();
   assert.throws(() => engine.act(first!.playerId, 'SLEEP' as any), /未知动作/);
+});
+
+test('显式状态机：开局进入 PREFLOP，结算后回到 WAITING', () => {
+  const { engine, emitMap } = makeEngine();
+  engine.addPlayer('A', 'A', 'seed-a');
+  engine.addPlayer('B', 'B', 'seed-b');
+  assert.equal(engine.state, HandState.WAITING);
+  engine.startHand();
+  assert.equal(engine.state, HandState.PREFLOP);
+  const first = (emitMap.get('broadcast') ?? []).find(m => m.type === 'ACTION_REQUIRED');
+  engine.act(first.playerId, 'FOLD');
+  assert.equal(engine.state, HandState.WAITING);
+});
+
+test('短 all-in 不重开已行动玩家的加注权，但要求其补齐下注', () => {
+  const { engine, emitMap } = makeEngine();
+  engine.addPlayer('A', 'A', 'seed-a', 1_000);
+  engine.addPlayer('B', 'B', 'seed-b', 1_000);
+  engine.addPlayer('C', 'C', 'seed-c', 150);
+  engine.startHand(); // A first; B posts 5, C posts 10
+  engine.act('A', 'RAISE', 100);
+  engine.act('B', 'CALL');
+  engine.act('C', 'ALL_IN'); // 150: +50 only, below A's +90 minimum raise
+
+  let required = (emitMap.get('broadcast') ?? []).filter(m => m.type === 'ACTION_REQUIRED').pop();
+  assert.equal(required.playerId, 'A');
+  assert.equal(required.toCall, 50);
+  assert.equal(required.raiseAllowed, false);
+  assert.throws(() => engine.act('A', 'RAISE', 250), /未重开加注权/);
+  engine.act('A', 'CALL');
+
+  required = (emitMap.get('broadcast') ?? []).filter(m => m.type === 'ACTION_REQUIRED').pop();
+  assert.equal(required.playerId, 'B');
+  assert.equal(required.toCall, 50);
+  assert.equal(required.raiseAllowed, false);
+  assert.throws(() => engine.act('B', 'RAISE', 250), /未重开加注权/);
+  engine.act('B', 'CALL');
+});
+
+test('不足额跟注会将仅剩筹码全部投入并标记 all-in', () => {
+  const { engine } = makeEngine();
+  engine.addPlayer('A', 'A', 'seed-a', 1_000);
+  engine.addPlayer('B', 'B', 'seed-b', 50);
+  engine.addPlayer('C', 'C', 'seed-c', 1_000);
+  engine.startHand();
+  engine.act('A', 'RAISE', 100);
+  engine.act('B', 'CALL');
+  const b = engine.seats.find(s => s.id === 'B')!;
+  assert.equal(b.chips, 0);
+  assert.equal(b.betThisStreet, 50);
+  assert.equal(b.allIn, true);
+});
+
+test('受保护快照可恢复进行中牌局与当前行动者', () => {
+  const { engine } = makeEngine();
+  engine.addPlayer('A', 'A', 'seed-a');
+  engine.addPlayer('B', 'B', 'seed-b');
+  engine.startHand();
+  const snapshot = engine.snapshot();
+
+  const restored = new GameEngine(() => undefined);
+  assert.equal(restored.restore(snapshot), true);
+  assert.equal(restored.state, HandState.PREFLOP);
+  assert.equal(restored.activePlayer, engine.activePlayer);
+  assert.deepEqual(restored.views(), engine.views());
 });

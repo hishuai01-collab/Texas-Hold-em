@@ -8,6 +8,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      # Backs the Redis-based EventStore/RedisTableRegistry/RedisReconnectTokenStore integration
+      # tests below. Unit tests never depend on this — they use the in-memory fakes — so a Redis
+      # outage here only skips the extra integration coverage, it never blocks the core suite.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -23,6 +36,8 @@ jobs:
 
       - name: Install & test server
         working-directory: poker-server
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
         run: |
           npm ci
           npm run test

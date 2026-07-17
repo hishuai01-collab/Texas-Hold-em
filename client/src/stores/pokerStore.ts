@@ -8,6 +8,7 @@ interface ActionRequest {
   playerId: string
   toCall: number
   minRaiseTo: number
+  raiseAllowed: boolean
 }
 
 interface PokerState {
@@ -57,10 +58,16 @@ const lastSeq = ref(-1)
 const playerId = ref<string | null>(localStorage.getItem(storageKeys.playerId))
 const reconnectToken = ref<string | null>(localStorage.getItem(storageKeys.reconnectToken))
 const playerName = ref(storedName)
+const tableId = ref('default')
 const actionVersion = ref(0)
+/** 断线重连期间冻结 UI 交互 */
+const frozen = ref(false)
+/** 错误追踪号，用于 Toast 显示唯一标识 */
+const errorCode = ref(0)
+/** 当前重连尝试次数 */
+const reconnectAttempt = ref(0)
 let socket: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-let reconnectAttempt = 0
 let disposed = false
 let outboundClientSeq = 0
 
@@ -131,6 +138,15 @@ function reduce(event: ServerEvent): void {
       state.actionRequest = event
       actionVersion.value += 1
       break
+    case 'PLAYER_LEFT':
+      setSeats(event.seats)
+      if (event.playerId === playerId.value && event.reason === 'BUSTED') {
+        playerId.value = null
+        reconnectToken.value = null
+        localStorage.removeItem(storageKeys.playerId)
+        localStorage.removeItem(storageKeys.reconnectToken)
+      }
+      break
     case 'STREET':
       state.street = event.street
       state.board = [...state.board, ...event.reveals.map(({ card }) => card)]
@@ -153,6 +169,7 @@ function reduce(event: ServerEvent): void {
       break
       case 'ERROR':
         state.error = event.message
+        errorCode.value += 1
         if (event.message.includes('重连校验失败') || event.message.includes('校验失败')) {
           playerId.value = null
           reconnectToken.value = null
@@ -177,6 +194,8 @@ function handleMessage(payload: string): void {
       .slice()
       .sort((a, b) => ('seq' in a ? a.seq : -1) - ('seq' in b ? b.seq : -1))
       .forEach(reduce)
+    // 重放完毕 → 解冻
+    frozen.value = false
     return
   }
   reduce(message)
@@ -189,14 +208,18 @@ function send(message: ClientPayload): boolean {
 }
 
 function socketUrl(): string {
-  return import.meta.env.VITE_POKER_WS_URL ?? `ws://${window.location.hostname || 'localhost'}:8080`
+  const base = import.meta.env.VITE_POKER_WS_URL ?? `ws://${window.location.hostname || 'localhost'}:8080`
+  const separator = base.includes('?') ? '&' : '?'
+  const tid = tableId.value.trim() || 'default'
+  return `${base}${separator}tableId=${encodeURIComponent(tid)}`
 }
 
 function scheduleReconnect(): void {
   if (disposed || reconnectTimer) return
-  const delay = Math.min(1000 * 2 ** reconnectAttempt, 10_000)
-  reconnectAttempt += 1
+  const delay = Math.min(1000 * 2 ** reconnectAttempt.value, 10_000)
+  reconnectAttempt.value += 1
   connectionStatus.value = 'RECONNECTING'
+  frozen.value = true
   state.eventLog = [] // preserve player identity and hand snapshot, clear connection-local diagnostics
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
@@ -204,18 +227,20 @@ function scheduleReconnect(): void {
   }, delay)
 }
 
-function connect(name = playerName.value): void {
+function connect(name = playerName.value, requestedTableId = tableId.value): void {
   disposed = false
   playerName.value = name.trim() || 'Player'
+  tableId.value = requestedTableId.trim() || 'default'
   localStorage.setItem(storageKeys.name, playerName.value)
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return
 
   connectionStatus.value = playerId.value ? 'RECONNECTING' : 'CONNECTING'
+  if (playerId.value) frozen.value = true
   socket = new WebSocket(socketUrl())
   socket.onopen = () => {
     outboundClientSeq = 0
     connectionStatus.value = 'CONNECTED'
-    reconnectAttempt = 0
+    reconnectAttempt.value = 0
     if (playerId.value && reconnectToken.value) {
       send({ type: 'RECONNECT', playerId: playerId.value, reconnectToken: reconnectToken.value, lastSeq: lastSeq.value })
     } else {
@@ -238,6 +263,7 @@ function disconnect(): void {
   socket?.close()
   socket = null
   connectionStatus.value = 'DISCONNECTED'
+  frozen.value = false
 }
 
 const mySeat = computed(() => state.seats.find((seat) => seat.id === playerId.value) ?? null)
@@ -250,7 +276,11 @@ export const pokerStore = {
   playerId,
   reconnectToken,
   playerName,
+  tableId,
   actionVersion,
+  frozen,
+  errorCode,
+  reconnectAttempt,
   mySeat,
   isMyTurn,
   connect,

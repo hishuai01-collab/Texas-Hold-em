@@ -25,6 +25,7 @@ export interface Pot {
 
 export type ClientPayload =
   | { type: 'JOIN'; name: string; clientSeed: string }
+  | { type: 'LEAVE' }
   | { type: 'START' }
   | { type: 'ACTION'; action: 'FOLD' | 'CHECK' | 'CALL' | 'RAISE' | 'ALL_IN'; amount?: number }
   | { type: 'RECONNECT'; playerId: string; reconnectToken: string; lastSeq: number }
@@ -35,10 +36,11 @@ export type ServerEvent =
   | { type: 'JOINED'; seq: number; you: string; reconnectToken: string; seats: SeatView[] }
   | { type: 'RECONNECTED'; seq: number; reconnectToken: string; seats: SeatView[] }
   | { type: 'PLAYER_JOINED'; seq: number; seats: SeatView[] }
+  | { type: 'PLAYER_LEFT'; seq: number; playerId: string; reason: 'LEFT' | 'BUSTED'; seats: SeatView[] }
   | { type: 'HAND_STARTED'; seq: number; handId: string; deckRoot: string; button: number; sb: number; bb: number; seats: SeatView[] }
   | { type: 'PRIVATE_CARDS'; seq: number; reveals: CardReveal[] }
   | { type: 'ACTION_APPLIED'; seq: number; playerId: string; action: string; amount: number; seats: SeatView[]; pot: number }
-  | { type: 'ACTION_REQUIRED'; seq: number; playerId: string; toCall: number; minRaiseTo: number }
+  | { type: 'ACTION_REQUIRED'; seq: number; playerId: string; toCall: number; minRaiseTo: number; raiseAllowed: boolean }
   | { type: 'STREET'; seq: number; street: 'FLOP' | 'TURN' | 'RIVER'; reveals: CardReveal[] }
   | { type: 'REFUND'; seq: number; playerId: string; amount: number }
   | { type: 'SHOWDOWN'; seq: number; pots: Pot[]; reveals: Record<string, CardReveal[]>; winnings: Record<string, number>; seats: SeatView[] }

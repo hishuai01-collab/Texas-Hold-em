@@ -4,6 +4,7 @@ import { deriveShuffleKey, shuffle } from './DeckShuffler.js';
 import { DeckCommitment, FULL_DECK } from './DeckCommitment.js';
 import { PotDistributor } from './PotDistributor.js';
 import { SidePotCalculator } from './SidePotCalculator.js';
+import { HandState } from '../model/HandState.js';
 import { MerkleAuditTree } from '../../infrastructure/audit/MerkleAuditTree.js';
 import type { CardReveal, ReplayableServerMsg, ServerMsg, SeatView } from '../../shared/protocol.js';
 
@@ -20,18 +21,17 @@ export interface EngineSeat {
   clientSeed: string;
 }
 
-type Street = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'DONE';
 export type Emit = (msg: ServerMsg, privateTo?: string) => void;
 
 /**
- * 单桌状态机。简化声明（作业范围内明说）：
- * - 未实现"不足额all-in不重开加注权"的细则（短all-in后其余玩家仍可再加注）
- * - 无烧牌（burn card）——不影响公平性，牌序已被承诺锚定
+ * 单桌状态机。短额 all-in 只会要求仍欠注者补齐，只有足额加注才重开加注权。
  */
 export class GameEngine {
   seats: EngineSeat[] = [];
-  private street: Street = 'DONE';
+  private street: HandState = HandState.WAITING;
   private deck: Card[] = [];
+  /** Confidential per-hand key, persisted only in the protected shutdown snapshot. */
+  private shuffleKey: Buffer | null = null;
   private dealt = 0;
   private board: Card[] = [];
   private commitment!: DeckCommitment;
@@ -41,6 +41,8 @@ export class GameEngine {
   private minRaiseInc = 0;
   private actingPos = -1;
   private needAction = new Set<string>();
+  /** Players that have acted since the last full raise and cannot re-raise. */
+  private raiseLocked = new Set<string>();
   handInProgress = false;
   private seq = 0;
   /** 重连鉴权：playerId → 服务端签发的短期 reconnectToken（一次性，验证通过后立即轮换） */
@@ -54,12 +56,28 @@ export class GameEngine {
     private readonly emit: Emit,
     public readonly sb = 5,
     public readonly bb = 10,
+    /** 每局开局回调（用于刷新 ACTION 风控签名 epoch 等），可选 */
+    private readonly onHandStart?: () => void,
   ) {}
 
   /** 当前轮到行动的玩家 id（用于 ACTION 防冒用） */
   get activePlayer(): string | null {
     const s = this.seats[this.actingPos];
     return s && this.handInProgress && this.needAction.has(s.id) ? s.id : null;
+  }
+
+  /** 当前该街最高下注额（供入口预校验做轻量判断） */
+  get currentBetAmount(): number {
+    return this.currentBet;
+  }
+
+  get state(): HandState { return this.street; }
+
+  get pendingAction(): { playerId: string; toCall: number } | null {
+    const playerId = this.activePlayer;
+    if (!playerId) return null;
+    const seat = this.seats[this.actingPos]!;
+    return { playerId, toCall: this.currentBet - seat.betThisStreet };
   }
 
   /**
@@ -94,8 +112,74 @@ export class GameEngine {
   }
 
   removePlayer(id: string): void {
+    if (this.handInProgress) throw new Error('手牌进行中，不能直接离桌');
     this.seats = this.seats.filter(s => s.id !== id);
     this.reconnectTokens.delete(id);
+  }
+
+  /** Timeout policy is centralized here so it receives the same state checks as a client action. */
+  autoAct(playerId: string): boolean {
+    if (this.activePlayer !== playerId) return false;
+    const seat = this.seats[this.actingPos];
+    this.act(playerId, this.currentBet > seat.betThisStreet ? 'FOLD' : 'CHECK');
+    return true;
+  }
+
+  /** Confidential operational snapshot; the configured destination must be access-controlled. */
+  snapshot(): object {
+    return {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      state: this.street,
+      handInProgress: this.handInProgress,
+      button: this.button,
+      currentBet: this.currentBet,
+      minRaiseInc: this.minRaiseInc,
+      actingPlayerId: this.activePlayer,
+      board: this.board,
+      seats: this.seats,
+      replayLog: this.replayLog,
+      replayPrivate: Object.fromEntries(this.replayPrivate),
+      deck: this.deck,
+      shuffleKey: this.shuffleKey?.toString('hex') ?? null,
+      dealt: this.dealt,
+      actingPos: this.actingPos,
+      needAction: [...this.needAction],
+      raiseLocked: [...this.raiseLocked],
+      seq: this.seq,
+    };
+  }
+
+  /** Restore a protected graceful-shutdown snapshot before accepting connections. */
+  restore(snapshot: unknown): boolean {
+    const s = snapshot as Record<string, unknown>;
+    if (s?.version !== 1 || !Array.isArray(s.seats)) return false;
+    try {
+      this.seats = s.seats as EngineSeat[];
+      this.street = s.state as HandState;
+      this.handInProgress = Boolean(s.handInProgress);
+      this.button = Number(s.button);
+      this.currentBet = Number(s.currentBet);
+      this.minRaiseInc = Number(s.minRaiseInc);
+      this.deck = (s.deck ?? []) as Card[];
+      this.shuffleKey = typeof s.shuffleKey === 'string' ? Buffer.from(s.shuffleKey, 'hex') : null;
+      this.dealt = Number(s.dealt ?? 0);
+      this.actingPos = Number(s.actingPos ?? -1);
+      this.needAction = new Set((s.needAction ?? []) as string[]);
+      this.raiseLocked = new Set((s.raiseLocked ?? []) as string[]);
+      this.seq = Number(s.seq ?? 0);
+      this.replayLog = (s.replayLog ?? []) as { seq: number; msg: ServerMsg }[];
+      this.replayPrivate = new Map(Object.entries((s.replayPrivate ?? {}) as Record<string, { seq: number; msg: ServerMsg }[]>));
+      this.board = (s.board ?? []) as Card[];
+      if (this.handInProgress) {
+        if (this.deck.length !== 52 || !this.shuffleKey || this.shuffleKey.length === 0) return false;
+        this.commitment = new DeckCommitment(this.deck, this.shuffleKey);
+      }
+      this.audit = new MerkleAuditTree();
+      return Number.isFinite(this.button) && Number.isFinite(this.currentBet) && Number.isFinite(this.actingPos);
+    } catch {
+      return false;
+    }
   }
 
   views(): SeatView[] {
@@ -115,6 +199,7 @@ export class GameEngine {
       s.contributed = 0; s.betThisStreet = 0; s.folded = false; s.allIn = false; s.holeCards = [];
     });
     this.handInProgress = true;
+    this.onHandStart?.();
     this.audit = new MerkleAuditTree();
     this.seq = 0;
     this.replayLog = [];
@@ -127,6 +212,7 @@ export class GameEngine {
     const handId = randomUUID();
     const serverSeed = randomBytes(32);
     const key = deriveShuffleKey(serverSeed, handId, this.seats.map(s => s.clientSeed));
+    this.shuffleKey = key;
     this.deck = shuffle(FULL_DECK, key);
     this.commitment = new DeckCommitment(this.deck, key);
     const deckRoot = this.commitment.root();
@@ -161,7 +247,7 @@ export class GameEngine {
       this.dispatch({ type: 'PRIVATE_CARDS', reveals }, this.seats[pos].id);
     }
 
-    this.street = 'PREFLOP';
+    this.street = HandState.PREFLOP;
     this.resetNeedAction();
     this.actingPos = this.nextActive((bbPos + 1) % n - 1 >= 0 ? bbPos : bbPos); // 起点=大盲后一位
     this.actingPos = this.nextActive(bbPos);
@@ -201,6 +287,9 @@ export class GameEngine {
         break;
       }
       case 'RAISE': {
+        if (this.raiseLocked.has(playerId)) {
+          throw new Error('短额 all-in 未重开加注权；只能跟注、弃牌或在无下注时过牌');
+        }
         // amount = 加注到的总额（raise to）。严格限制在 [minRaiseTo, 玩家最大可下注]，防筹码溢出
         const minTo = this.currentBet + this.minRaiseInc;
         const maxTo = s.betThisStreet + s.chips; // 玩家全部筹码能加注到的最高总额
@@ -208,20 +297,27 @@ export class GameEngine {
         if (amount > maxTo) throw new Error(`最多加到${maxTo}`);
         const need = amount - s.betThisStreet;
         if (need >= s.chips) return this.act(playerId, 'ALL_IN');
-        this.minRaiseInc = amount - this.currentBet;
-        this.currentBet = amount;
+        const raiseSize = amount - this.currentBet;
         this.pay(s, need);
+        this.minRaiseInc = raiseSize;
+        this.currentBet = amount;
         this.reopenAction(s.id);
         break;
       }
       case 'ALL_IN': {
         const total = s.betThisStreet + s.chips;
-        if (total > this.currentBet) {
-          this.minRaiseInc = Math.max(this.minRaiseInc, total - this.currentBet);
-          this.currentBet = total;
-          this.reopenAction(s.id);
-        }
+        const previousBet = this.currentBet;
+        const raiseSize = total - previousBet;
         this.pay(s, s.chips);
+        if (total > this.currentBet) {
+          this.currentBet = total;
+          if (raiseSize >= this.minRaiseInc) {
+            this.minRaiseInc = raiseSize;
+            this.reopenAction(s.id);
+          } else {
+            this.requireResponsesToShortAllIn(s.id);
+          }
+        }
         break;
       }
       default:
@@ -229,6 +325,7 @@ export class GameEngine {
     }
 
     this.needAction.delete(s.id);
+    this.raiseLocked.add(s.id);
     this.log({ event: 'ACTION', playerId, action, amount });
     this.dispatch({
       type: 'ACTION_APPLIED', playerId, action,
@@ -284,6 +381,7 @@ export class GameEngine {
   }
 
   private pay(s: EngineSeat, amount: number): void {
+    if (amount < 0 || amount > s.chips) throw new Error('下注金额非法');
     s.chips -= amount; s.contributed += amount; s.betThisStreet += amount;
     if (s.chips === 0) s.allIn = true;
   }
@@ -292,12 +390,23 @@ export class GameEngine {
     this.needAction = new Set(
       this.seats.filter(p => !p.folded && !p.allIn && p.id !== raiserId).map(p => p.id),
     );
+    this.raiseLocked = new Set([raiserId]);
+  }
+
+  /** A short all-in changes the price but does not reset already-used raise rights. */
+  private requireResponsesToShortAllIn(raiserId: string): void {
+    for (const p of this.seats) {
+      if (!p.folded && !p.allIn && p.id !== raiserId && p.betThisStreet < this.currentBet) {
+        this.needAction.add(p.id);
+      }
+    }
   }
 
   private resetNeedAction(): void {
     this.needAction = new Set(
       this.seats.filter(p => !p.folded && !p.allIn).map(p => p.id),
     );
+    this.raiseLocked.clear();
   }
 
   // ---------- 推进 ----------
@@ -328,6 +437,7 @@ export class GameEngine {
       type: 'ACTION_REQUIRED', playerId: s.id,
       toCall: this.currentBet - s.betThisStreet,
       minRaiseTo: this.currentBet + this.minRaiseInc,
+      raiseAllowed: !this.raiseLocked.has(s.id),
     });
   }
 
@@ -336,12 +446,12 @@ export class GameEngine {
     this.currentBet = 0;
     this.minRaiseInc = this.bb;
 
-    const order: Street[] = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
+    const order: HandState[] = [HandState.PREFLOP, HandState.FLOP, HandState.TURN, HandState.RIVER];
     const idx = order.indexOf(this.street);
-    if (this.street === 'RIVER') return this.settleHand();
+    if (this.street === HandState.RIVER) return this.settleHand();
     this.street = order[idx + 1];
 
-    const count = this.street === 'FLOP' ? 3 : 1;
+    const count = this.street === HandState.FLOP ? 3 : 1;
     const reveals: CardReveal[] = [];
     for (let i = 0; i < count; i++) {
       const pos = this.dealt;
@@ -349,7 +459,7 @@ export class GameEngine {
       reveals.push(this.commitment.reveal(pos));
     }
     this.log({ event: 'STREET', street: this.street, cards: reveals.map(r => r.card) });
-      this.dispatch({ type: 'STREET', street: this.street as 'FLOP' | 'TURN' | 'RIVER', reveals });
+    this.dispatch({ type: 'STREET', street: this.street as HandState.FLOP | HandState.TURN | HandState.RIVER, reveals });
 
     // 所有人都all-in（或只剩一个能动）→ 直接跑完剩余街
     this.resetNeedAction();
@@ -365,6 +475,7 @@ export class GameEngine {
   // ---------- 结算 ----------
   /** Independently settle the main pot and every side pot after all contributions close. */
   private settleHand(): void {
+    this.street = HandState.SETTLE;
     const refund = SidePotCalculator.returnUncalled(this.seats);
     if (refund) {
       this.log({ event: 'REFUND', ...refund });
@@ -405,6 +516,18 @@ export class GameEngine {
     });
     this.dispatch({ type: 'HAND_ENDED', auditRoot: this.audit.root().toString('hex'), eventCount: this.audit.size });
     this.handInProgress = false;
-    this.street = 'DONE';
+    this.street = HandState.WAITING;
+
+    // A zero-stack seat cannot be carried into the next deal.  It is removed
+    // only after SHOWDOWN/HAND_ENDED so every client has received its final
+    // accounting event first.
+    const busted = this.seats.filter(s => s.chips === 0).map(s => s.id);
+    if (busted.length > 0) {
+      this.seats = this.seats.filter(s => !busted.includes(s.id));
+      for (const playerId of busted) this.reconnectTokens.delete(playerId);
+      for (const playerId of busted) {
+        this.dispatch({ type: 'PLAYER_LEFT', playerId, reason: 'BUSTED', seats: this.views() });
+      }
+    }
   }
 }
