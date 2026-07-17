@@ -114,15 +114,28 @@ jobs:
         env:
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_USER: ${{ secrets.PROD_USER }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           set -eu
           ssh "$PROD_USER@$PROD_HOST" 'set -eu
             mkdir -p '"$LOG_DIR"'
-            test -r /etc/poker-server/env || { echo "::error::missing /etc/poker-server/env (must contain REDIS_URL)"; exit 1; }
-            set -a
-            . /etc/poker-server/env
-            set +a
-            test -n "${REDIS_URL:-}" || { echo "::error::REDIS_URL missing from /etc/poker-server/env"; exit 1; }
+
+            # REDIS_URL 来源优先级：服务器 /etc/poker-server/env > GitHub Secret (REDIS_URL) > 报错。
+            # 生产环境多桌/事件溯源/重连令牌均依赖 Redis，缺失即中止部署（不静默回退内存态）。
+            if [ -r /etc/poker-server/env ]; then
+              set -a
+              . /etc/poker-server/env
+              set +a
+            fi
+            if [ -z "${REDIS_URL:-}" ] && [ -n "$REDIS_URL" ]; then
+              REDIS_URL="$REDIS_URL"
+            fi
+            if [ -z "${REDIS_URL:-}" ]; then
+              echo "::error::REDIS_URL 缺失：请 (1) 在服务器创建 /etc/poker-server/env 写入 REDIS_URL=... 并 chmod 600，或 (2) 在仓库 production Environment 配置 Secret REDIS_URL。生产环境不允许多实例/内存态启动。"
+              exit 1
+            fi
+            export REDIS_URL
+
             cd '"$REMOTE_DIR"'
             npm ci --omit=dev
 
