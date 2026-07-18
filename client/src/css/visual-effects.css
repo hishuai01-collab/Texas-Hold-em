@@ -1,0 +1,367 @@
+/**
+ * visual-effects.css
+ *
+ * 沉浸式视觉效果层 —— 与业务逻辑完全解耦。
+ * 包含：
+ *  1. 3D 纹理桌面（felt）背景
+ *  2. 胜利光效（WinCelebration）
+ *  3. 时间轴（ActionLog）滚动条
+ *  4. 通用视觉效果工具类
+ *
+ * 原则：所有视觉效果封装在此文件中，业务组件只引用 class。
+ */
+
+/* ════════════════════════════════════════
+   1. 3D 纹理桌面（Felt Background）
+   ════════════════════════════════════════ */
+
+/* 主桌面 —— 用于 PokerTable 的背景升级 */
+.felt-3d {
+  /* 基础绿色毡 */
+  background:
+    /* 织物纹理：细微噪点 */
+    repeating-conic-gradient(
+      rgba(0, 80, 40, 0.03) 0% 25%,
+      transparent 0% 50%
+    ) 0 0 / 4px 4px,
+    /* 径向光晕（中心光源） */
+    radial-gradient(
+      ellipse at 45% 40%,
+      rgba(40, 160, 80, 0.35) 0%,
+      rgba(10, 70, 40, 0.6) 40%,
+      rgba(2, 40, 20, 0.9) 75%,
+      rgba(1, 25, 12, 1) 100%
+    );
+  /* 叠加细微的布料纹理 */
+  background-blend-mode: overlay, normal;
+}
+
+/* 3D 隆起效果（用于桌面椭圆中心区域） */
+.felt-dome {
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      rgba(60, 180, 100, 0.08) 0%,
+      transparent 60%
+    );
+  pointer-events: none;
+}
+
+/* 桌面边缘光晕（模拟厚度） */
+.felt-rim-glow {
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.5),
+    inset 0 -20px 40px rgba(0, 50, 20, 0.3),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* 桌面反射高光（模拟漆面） */
+.felt-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.01) 30%,
+    transparent 50%
+  );
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════
+   2. 胜利光效（WinCelebration）
+   ════════════════════════════════════════ */
+
+/* 主容器 */
+.win-celebration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 100;
+}
+
+/* 金色粒子 */
+.win-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fcd34d;
+  box-shadow: 0 0 6px rgba(252, 211, 77, 0.6);
+  animation: win-particle-fall var(--fall-duration, 2s) linear forwards;
+  animation-delay: var(--fall-delay, 0s);
+}
+
+@keyframes win-particle-fall {
+  0% {
+    transform: translateY(-20px) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform:
+      translateY(calc(100vh + 40px))
+      translateX(var(--drift-x, 60px))
+      rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* 胜利光柱 */
+.win-beam {
+  position: absolute;
+  bottom: -20%;
+  left: var(--beam-x, 50%);
+  width: 4px;
+  height: 0;
+  background: linear-gradient(to top, transparent, rgba(252, 211, 77, 0.6), transparent);
+  animation: win-beam-rise 1.2s ease-out forwards;
+  animation-delay: var(--beam-delay, 0s);
+  transform-origin: bottom center;
+}
+
+@keyframes win-beam-rise {
+  0% {
+    height: 0;
+    opacity: 0;
+  }
+  100% {
+    height: 140%;
+    opacity: 1;
+  }
+}
+
+/* 中心光晕 */
+.win-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(252, 211, 77, 0.15), transparent 70%);
+  transform: translate(-50%, -50%);
+  animation: win-glow-pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes win-glow-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* 胜利文字 */
+.win-title {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  font-weight: 900;
+  color: #fcd34d;
+  text-shadow:
+    0 0 20px rgba(252, 211, 77, 0.6),
+    0 0 60px rgba(252, 211, 77, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: win-title-reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+  letter-spacing: 0.1em;
+}
+
+@keyframes win-title-reveal {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) translateY(0);
+  }
+}
+
+/* 胜利金额 */
+.win-amount {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    0 0 12px rgba(252, 211, 77, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: win-amount-appear 0.6s ease-out 0.4s forwards;
+  opacity: 0;
+}
+
+@keyframes win-amount-appear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0);
+  }
+}
+
+/* ════════════════════════════════════════
+   3. 时间轴（ActionLog）
+   ════════════════════════════════════════ */
+
+.action-log {
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+}
+
+.action-log::-webkit-scrollbar {
+  width: 4px;
+}
+
+.action-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.action-log::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 999px;
+}
+
+.action-log::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* 时间轴条目 */
+.action-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  transition: background 0.2s;
+}
+
+.action-log-item:hover {
+  background: rgba(212, 175, 55, 0.06);
+}
+
+/* 时间轴圆点 */
+.action-log-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.5);
+  position: relative;
+}
+
+/* 连接线 */
+.action-log-dot::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  height: calc(100% + 12px);
+  width: 1px;
+  background: rgba(212, 175, 55, 0.15);
+  transform: translateX(-50%);
+}
+
+.action-log-item:last-child .action-log-dot::after {
+  display: none;
+}
+
+/* 时间轴标签 */
+.action-log-label {
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.action-log-detail {
+  color: rgba(248, 250, 252, 0.7);
+}
+
+.action-log-timestamp {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: rgba(148, 163, 184, 0.5);
+  margin-left: auto;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+}
+
+/* ════════════════════════════════════════
+   4. 通用视觉效果工具类
+   ════════════════════════════════════════ */
+
+/* 金色渐变文本 */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #fcd34d, #d4af37, #fcd34d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 发光边框动画 */
+@keyframes border-glow-pulse {
+  0%, 100% {
+    border-color: rgba(212, 175, 55, 0.3);
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.1);
+  }
+  50% {
+    border-color: rgba(212, 175, 55, 0.6);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+  }
+}
+
+.border-glow-pulse {
+  animation: border-glow-pulse 3s ease-in-out infinite;
+}
+
+/* 渐入渐出 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+/* 骨架脉冲替代（更细腻） */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}

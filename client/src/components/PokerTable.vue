@@ -17,15 +17,9 @@ const props = defineProps<{
   revealedCards: Record<string, Card[]>
 }>()
 
-/**
- * 在椭圆上等距分布座位
- * 椭圆参数：水平半径 38%, 垂直半径 28%
- * 从底部中心（seatIndex=0）开始逆时针排列
- */
 function seatTransform(seatIndex: number, total: number): { x: string; y: string } {
-  const rx = 38  // 水平半径 %
-  const ry = 28  // 垂直半径 %
-  // 从 -90°（底部）开始，逆时针等距
+  const rx = 38
+  const ry = 28
   const angle = (seatIndex / total) * Math.PI * 2 - Math.PI / 2
   const x = 50 + rx * Math.cos(angle)
   const y = 50 + ry * Math.sin(angle)
@@ -37,24 +31,20 @@ const seatStyles = computed(() => {
   if (total === 0) return []
   return props.seats.map((seat) => {
     const pos = seatTransform(seat.seatIndex, total)
-    return {
-      left: pos.x,
-      top: pos.y,
-    }
+    return { left: pos.x, top: pos.y }
   })
 })
 
-/** 翻牌 stagger：每张牌延迟 index * 80ms */
 const boardCardStyle = (index: number) => ({
   transitionDelay: `${index * 80}ms`,
 })
 </script>
 
 <template>
-  <section class="relative min-h-[520px] overflow-hidden rounded-[3rem] border-[14px] border-amber-950 bg-emerald-800 p-3 shadow-felt sm:min-h-[620px]">
-    <!-- 桌面背景 -->
-    <div class="absolute inset-0 rounded-[2.2rem] border border-emerald-300/20 bg-[radial-gradient(ellipse_at_center,_rgba(35,151,93,.5),_rgba(1,55,37,.9))]" />
-    <div class="absolute left-1/2 top-1/2 h-[44%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-4 border-amber-200/30 bg-emerald-700/45 shadow-inner" />
+  <section class="relative min-h-[520px] overflow-hidden rounded-[3rem] border-[14px] border-gray-800 p-3 sm:min-h-[620px] bg-gray-950 shadow-xl">
+    <!-- 桌面背景：极简灰色渐变 -->
+    <div class="absolute inset-0 rounded-[2.2rem] border border-gray-800 bg-gradient-to-b from-gray-900 to-gray-950" />
+    <div class="absolute left-1/2 top-1/2 h-[44%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-4 border-gray-700/30 bg-gray-900/45 shadow-inner" />
 
     <!-- 中央信息区 -->
     <div class="absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 text-center">
@@ -71,7 +61,7 @@ const boardCardStyle = (index: number) => ({
           :style="boardCardStyle(index)"
         />
       </TransitionGroup>
-      <p v-if="board.length === 0" class="mt-8 text-sm text-emerald-100/60">等待翻牌</p>
+      <p v-if="board.length === 0" class="mt-8 text-sm text-gray-500">等待翻牌</p>
     </div>
 
     <!-- 动态座位 -->
@@ -91,7 +81,7 @@ const boardCardStyle = (index: number) => ({
     </div>
 
     <!-- 空状态 -->
-    <p v-if="seats.length === 0" class="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 translate-y-24 text-sm text-emerald-100/70">牌桌空无一人，等待玩家加入…</p>
+    <p v-if="seats.length === 0" class="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 translate-y-24 text-sm text-gray-500">牌桌空无一人，等待玩家加入…</p>
   </section>
 </template>
 
