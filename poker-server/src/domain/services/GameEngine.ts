@@ -73,6 +73,9 @@ export class GameEngine {
 
   get state(): HandState { return this.street; }
 
+  /** 当前公共牌（只读快照，用于机器人/展示层判断牌力，不影响引擎内部状态）。 */
+  get boardCards(): readonly Card[] { return this.board; }
+
   get pendingAction(): { playerId: string; toCall: number } | null {
     const playerId = this.activePlayer;
     if (!playerId) return null;

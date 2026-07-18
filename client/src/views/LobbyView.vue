@@ -24,19 +24,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-[#080d18] px-4 py-5 text-slate-100 sm:px-8 sm:py-8">
+  <main class="min-h-screen bg-[radial-gradient(ellipse_at_top,_#12100a_0%,_#050505_65%)] px-4 py-5 text-slate-100 sm:px-8 sm:py-8">
     <div class="mx-auto max-w-6xl">
-      <header class="flex flex-col gap-5 border-b border-slate-800 pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <header class="flex flex-col gap-5 border-b border-gold-700/30 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p class="font-mono text-[11px] font-semibold tracking-[.3em] text-slate-500">POKER / LOBBY</p>
+          <p class="font-mono text-[11px] font-semibold tracking-[.3em] text-gold-500">POKER / LOBBY</p>
           <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white">游戏大厅</h1>
           <p class="mt-2 text-sm text-slate-500">选择一张牌桌加入游戏。</p>
         </div>
-        <section class="border border-slate-800 bg-slate-950 px-4 py-3 sm:min-w-52" aria-label="User Wallet">
-          <p class="font-mono text-[10px] tracking-[.24em] text-slate-600">USER WALLET</p>
+        <section class="border border-gold-700/40 bg-slate-950 px-4 py-3 sm:min-w-52" aria-label="User Wallet">
+          <p class="font-mono text-[10px] tracking-[.24em] text-gold-600">USER WALLET</p>
           <div class="mt-2 flex items-baseline justify-between gap-4">
             <span class="text-sm text-slate-400">{{ userStore.user.value?.name ?? 'GUEST' }}</span>
-            <span class="font-mono text-lg text-white">{{ balanceLabel }}</span>
+            <span class="font-mono text-lg text-gold-300">{{ balanceLabel }}</span>
           </div>
           <p class="mt-1 text-right font-mono text-[10px] text-slate-600">BALANCE</p>
         </section>
@@ -57,9 +57,9 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="overflow-x-auto border border-slate-800 bg-slate-950/60">
+        <div class="overflow-x-auto border border-gold-700/30 bg-slate-950/60">
           <table class="w-full min-w-[640px] border-collapse text-left text-sm">
-            <thead class="border-b border-slate-800 font-mono text-[10px] tracking-[.16em] text-slate-600">
+            <thead class="border-b border-gold-700/30 font-mono text-[10px] tracking-[.16em] text-gold-600/80">
               <tr>
                 <th class="px-5 py-4 font-medium">TABLE</th>
                 <th class="px-5 py-4 font-medium">BLINDS</th>
@@ -84,7 +84,7 @@ onMounted(() => {
                 <td class="px-5 py-5 text-right">
                   <RouterLink
                     v-if="statusLabel(table) === 'OPEN'"
-                    class="font-mono text-xs text-white underline decoration-slate-700 underline-offset-4 transition hover:decoration-white"
+                    class="font-mono text-xs font-bold text-gold-300 underline decoration-gold-700 underline-offset-4 transition hover:text-gold-200 hover:decoration-gold-300"
                     :to="{ name: 'table', params: { id: table.id } }"
                   >
                     JOIN →

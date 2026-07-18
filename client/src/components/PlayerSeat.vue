@@ -38,9 +38,9 @@ watch(
   <article
     class="relative w-32 rounded-2xl border px-3 py-2 text-left shadow-lg transition duration-300 sm:w-40"
     :class="[
-      seat.folded ? 'border-gray-800 bg-gray-950/65 opacity-45 grayscale' : 'border-gray-700 bg-gray-950/85',
-      isMe ? 'ring-2 ring-gray-500' : '',
-      isActing ? 'seat-active border-gray-500 bg-gray-900 ring-2 ring-gray-400' : '',
+      seat.folded ? 'border-gray-800 bg-gray-950/70 opacity-45 grayscale' : 'border-gold-700/50 bg-gray-950/90',
+      isMe ? 'ring-2 ring-gold-400/70' : '',
+      isActing ? 'seat-active border-gold-400 bg-gray-900 ring-2 ring-gold-400' : '',
     ]"
   >
     <!-- 行动倒计时圆环 -->
@@ -50,23 +50,23 @@ watch(
     <div class="flex items-center gap-1.5 pr-5">
       <span
         class="h-2.5 w-2.5 rounded-full"
-        :class="seat.folded ? 'bg-gray-600' : seat.allIn ? 'bg-gray-400' : 'bg-gray-500'"
+        :class="seat.folded ? 'bg-gray-600' : seat.allIn ? 'bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,.8)]' : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.7)]'"
       />
       <p class="truncate text-sm font-bold text-gray-100">
-        {{ seat.name }}<span v-if="isMe" class="ml-1 text-gray-400">你</span>
+        {{ seat.name }}<span v-if="isMe" class="ml-1 text-gold-300">你</span>
       </p>
     </div>
 
     <!-- 筹码 -->
     <p
-      class="mt-1 text-xs tabular-nums text-gray-300"
+      class="mt-1 text-xs tabular-nums text-gold-200"
       :class="{ 'animate-chip-up': chipsAnimating }"
     >
       筹码 {{ seat.chips.toLocaleString() }}
     </p>
     <p class="text-[11px] text-gray-500">本街 {{ seat.betThisStreet }} · 总投入 {{ seat.contributed }}</p>
     <p v-if="seat.folded" class="mt-1 text-[10px] font-semibold tracking-widest text-gray-500">FOLDED</p>
-    <p v-else-if="seat.allIn" class="mt-1 text-[10px] font-semibold tracking-widest text-gray-400">ALL IN</p>
+    <p v-else-if="seat.allIn" class="mt-1 text-[10px] font-semibold tracking-widest text-rose-400">ALL IN</p>
 
     <!-- 手牌 -->
     <div :key="cardFlyKey" class="mt-2 flex -space-x-1.5">
@@ -93,16 +93,16 @@ watch(
   width: 28px;
   height: 28px;
   border-radius: 9999px;
-  background: conic-gradient(#9ca3af 0deg, #9ca3af 360deg, transparent 360deg);
+  background: conic-gradient(#e8bd4e 0deg, #e8bd4e 360deg, transparent 360deg);
   mask: radial-gradient(transparent 51%, #000 54%);
   animation: countdown 15s linear forwards;
 }
 @keyframes countdown {
-  from { background: conic-gradient(#9ca3af 360deg, transparent 0deg); }
-  to { background: conic-gradient(#9ca3af 0deg, transparent 0deg); }
+  from { background: conic-gradient(#e8bd4e 360deg, transparent 0deg); }
+  to { background: conic-gradient(#e8bd4e 0deg, transparent 0deg); }
 }
 @keyframes seat-glow {
-  from { box-shadow: 0 0 8px rgba(156, 163, 175, .25); }
-  to { box-shadow: 0 0 28px rgba(156, 163, 175, .5); }
+  from { box-shadow: 0 0 8px rgba(232, 189, 78, .3); }
+  to { box-shadow: 0 0 28px rgba(232, 189, 78, .6); }
 }
 </style>

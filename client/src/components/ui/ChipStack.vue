@@ -2,9 +2,8 @@
 /**
  * ChipStack.vue (ui/monochrome version)
  *
- * 黑白极客风筹码堆栈组件。
+ * 赌场红金筹码堆栈组件。
  * requestAnimationFrame 驱动的抛入/飞出动画，纯 transform/opacity 硬件加速。
- * 严格按照：黑底 bg-gray-950，极细 border-gray-800，白色/金属灰文字。无艳丽色彩。
  *
  * Props:
  *  - value     : 筹码数量（枚）
@@ -172,23 +171,24 @@ onUnmounted(() => { if (rafId) cancelAnimationFrame(rafId) })
   position: absolute;
   bottom: 0;
   width: 36px;
-  height: 8px;
+  height: 9px;
   border-radius: 50%;
-  background: #1a1a1a;        /* bg-gray-950 等价 */
-  border: 1.5px solid #374151; /* border-gray-700 */
+  background:
+    repeating-conic-gradient(#7a1230 0deg 30deg, #b3182f 30deg 60deg) border-box;
+  border: 1.5px solid #e8bd4e; /* gold rim */
   box-shadow:
-    inset 0 -1px 1px rgba(0,0,0,.4),
-    0 1px 1px rgba(0,0,0,.25);
+    inset 0 -1px 1px rgba(0,0,0,.5),
+    0 1px 2px rgba(0,0,0,.4);
   will-change: transform, opacity;
 }
-/* 内圈装饰线（极简） */
+/* 内圈金色装饰线 */
 .chip::after {
   content: '';
   position: absolute;
-  inset: 1px;
+  inset: 2px;
   border-radius: 50%;
-  border: 1px solid #4b5563;  /* gray-600 */
-  opacity: .35;
+  border: 1px dashed #f6e3ab;
+  opacity: .55;
 }
 .flyout {
   pointer-events: none;
@@ -197,9 +197,9 @@ onUnmounted(() => { if (rafId) cancelAnimationFrame(rafId) })
   margin-top: 2px;
   font-size: 9px;
   font-weight: 600;
-  color: #9ca3af;             /* gray-400 */
+  color: #f0d27a;             /* gold-300 */
   background: #111827;        /* gray-900 */
-  border: 1px solid #374151;  /* gray-700 */
+  border: 1px solid #8a6620;  /* gold-700 */
   border-radius: 999px;
   padding: 0 5px;
   line-height: 14px;

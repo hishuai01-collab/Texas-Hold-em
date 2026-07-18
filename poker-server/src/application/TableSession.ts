@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { GameEngine } from '../domain/services/GameEngine.js';
+import { decideAction, decisionDelayMs, handStrength, randomPersonality, type Personality } from '../domain/services/BotStrategy.js';
 import { TableActor } from './TableActor.js';
 import { TimeoutManager } from './TimeoutManager.js';
 import { newTableEpoch } from '../infrastructure/security/ActionRiskControl.js';
@@ -32,6 +33,7 @@ export class TableSession {
   readonly timeoutManager: TimeoutManager;
   readonly sockets = new Map<string, WebSocket>();
   readonly botIds = new Set<string>();
+  private readonly botPersonality = new Map<string, Personality>();
   tableEpoch: string;
   lastActivityAt = Date.now();
   private streamCursor = '0';
@@ -73,6 +75,7 @@ export class TableSession {
     for (let i = 0; i < count; i++) {
       const id = `bot-${i + 1}`;
       this.botIds.add(id);
+      this.botPersonality.set(id, randomPersonality());
       this.engine.addPlayer(id, `Bot·${i + 1}号`, randomBytes(8).toString('hex'));
     }
   }
@@ -155,9 +158,22 @@ export class TableSession {
     if (msg.type === 'ACTION_REQUIRED') {
       this.timeoutManager.arm(msg.playerId, msg.toCall);
       if (this.botIds.has(msg.playerId)) {
+        const { playerId, toCall, minRaiseTo, raiseAllowed } = msg;
+        const delay = decisionDelayMs(toCall, this.engine.seats.find(s => s.id === playerId)?.chips ?? 0);
         setTimeout(() => this.runCommand(() => {
-          try { this.engine.act(msg.playerId, msg.toCall > 0 ? 'CALL' : 'CHECK'); } catch { /* action already advanced */ }
-        }), 400).unref?.();
+          try {
+            const seat = this.engine.seats.find(s => s.id === playerId);
+            if (!seat) return;
+            const decision = decideAction({
+              personality: this.botPersonality.get(playerId) ?? 'tight-passive',
+              strength: handStrength(seat.holeCards, this.engine.boardCards),
+              toCall, minRaiseTo, raiseAllowed,
+              maxRaiseTo: seat.betThisStreet + seat.chips,
+              chips: seat.chips,
+            });
+            this.engine.act(playerId, decision.action, decision.amount);
+          } catch { /* 局面已推进（比如全员弃牌提前结算），忽略过期决策 */ }
+        }), delay).unref?.();
       }
     }
     if (msg.type === 'ACTION_APPLIED') this.timeoutManager.clear(msg.playerId);
