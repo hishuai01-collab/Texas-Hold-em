@@ -151,6 +151,7 @@ export const serverMsgSchema = z.discriminatedUnion('type', [
     type: z.literal('ERROR'),
     code: z.string().optional(),
     message: z.string(),
+    traceId: z.string(),
   }),
   z.object({
     type: z.literal('EVENT_REPLAY'),

@@ -140,3 +140,26 @@ test('TableSession：熔断触发会调用 onBreakerTrip 并携带 tableId', asy
   assert.equal(trippedFor, 't5');
   assert.equal(session.actor.isHealthy, false);
 });
+
+test('TableSession：getReplayFor 在内存为空时回退到 EventStore 读取', async () => {
+  const eventStore = new InMemoryEventStore();
+  const metrics = new PokerMetrics();
+  const session = new TableSession({ tableId: 't6', eventStore, metrics });
+
+  session.runCommand(() => {
+    session.engine.addPlayer('A', 'A', 'seed-a');
+    session.engine.addPlayer('B', 'B', 'seed-b');
+    session.engine.startHand();
+    session.engine.act(session.engine.activePlayer!, 'FOLD');
+  });
+  await drained(session);
+
+  const snapshot = await eventStore.readSnapshot('t6');
+  assert.ok(snapshot);
+
+  const newSession = new TableSession({ tableId: 't6', eventStore, metrics });
+  newSession.engine.restore(snapshot!.engine);
+
+  const events = await newSession.getReplayFor('A', -1);
+  assert.ok(events.some((e: any) => e.type === 'HAND_STARTED'), '应能从 EventStore 回放 HAND_STARTED');
+});

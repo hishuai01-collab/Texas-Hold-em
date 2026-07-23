@@ -8,8 +8,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prestart": "bash scripts/env-check.sh",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
+    "predev": "bash scripts/env-check.sh",
     "test": "tsx --test test/*.test.ts",
     "test:e2e": "tsx --test test/e2e/*.test.ts"
   },

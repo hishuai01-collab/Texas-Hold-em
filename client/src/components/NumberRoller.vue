@@ -77,7 +77,6 @@ updateOffsets(props.value)
 
 /* ── 目标数字位（用于对比变化） ── */
 const currentDigitValues = computed(() => numberToDigits(displayValue.value))
-const targetDigitValues = computed(() => numberToDigits(props.value))
 
 /* ── 动画主循环 ── */
 function animate(timestamp: number) {
@@ -141,7 +140,7 @@ onUnmounted(() => {
     <!-- 逐位滚动 -->
     <template v-if="padZero">
       <span
-        v-for="(digitVal, idx) in currentDigitValues"
+        v-for="(_, idx) in currentDigitValues"
         :key="`digit-${idx}`"
         class="roller-digit"
       >

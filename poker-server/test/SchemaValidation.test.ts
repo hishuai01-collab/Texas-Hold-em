@@ -30,7 +30,7 @@ test('schema: RAISE 负 amount 被拒', () => {
 });
 
 test('validateOutbound: 合法 ServerMsg 通过', () => {
-  const [ok] = validateOutbound({ type: 'ERROR', message: 'boom' });
+  const [ok] = validateOutbound({ type: 'ERROR', message: 'boom', traceId: 'trace-1' });
   assert.equal(ok, true);
 });
 

@@ -2,8 +2,47 @@ import Redis from 'ioredis';
 import type { EventStore, StoredTableEvent, TableSnapshotRecord } from './EventStore.js';
 import { InMemoryEventStore } from './EventStore.js';
 
-const streamKey = (tableId: string): string => `poker:stream:${tableId}`;
-const snapshotKey = (tableId: string): string => `poker:snapshot:${tableId}`;
+const streamKey = (tableId: string): string => `poker:table:${tableId}:events`;
+const snapshotKey = (tableId: string): string => `poker:table:${tableId}:snapshot`;
+
+function flattenEngineForHash(engine: Record<string, unknown>): Record<string, string> {
+  const seats = Array.isArray(engine.seats) ? engine.seats : [];
+  const simplifiedSeats = seats.map((s: Record<string, unknown>) => ({
+    id: s.id,
+    chips: s.chips,
+    contributed: s.contributed,
+    betThisStreet: s.betThisStreet,
+    folded: s.folded,
+    allIn: s.allIn,
+    seatIndex: s.seatIndex,
+  }));
+  return {
+    tableId: String(engine.tableId ?? ''),
+    version: String(engine.version ?? 1),
+    savedAt: String(engine.savedAt ?? new Date().toISOString()),
+    streamCursor: String(engine.streamCursor ?? '0'),
+    handInProgress: String(Boolean(engine.handInProgress)),
+    button: String(engine.button ?? -1),
+    handId: String(engine.handId ?? ''),
+    seats: JSON.stringify(simplifiedSeats),
+    engine: JSON.stringify(engine),
+  };
+}
+
+function reconstructSnapshotFromHash(hash: Record<string, string>): TableSnapshotRecord | null {
+  try {
+    const engine = JSON.parse(hash.engine ?? '{}');
+    return {
+      version: 1,
+      tableId: hash.tableId,
+      savedAt: hash.savedAt,
+      streamCursor: hash.streamCursor,
+      engine,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** The immediate successor of a Redis Stream ID (`<ms>-<seq>`), used to make XTRIM MINID exclusive. */
 function nextStreamId(id: string): string {
@@ -51,18 +90,18 @@ export class RedisEventStore implements EventStore {
 
   async writeSnapshot(tableId: string, record: TableSnapshotRecord): Promise<void> {
     await this.ensureConnected();
-    await this.redis.set(snapshotKey(tableId), JSON.stringify(record));
+    const hash = flattenEngineForHash(record.engine as Record<string, unknown>);
+    hash.tableId = record.tableId;
+    hash.savedAt = record.savedAt;
+    hash.streamCursor = record.streamCursor;
+    await this.redis.hmset(snapshotKey(tableId), hash);
   }
 
   async readSnapshot(tableId: string): Promise<TableSnapshotRecord | null> {
     await this.ensureConnected();
-    const raw = await this.redis.get(snapshotKey(tableId));
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as TableSnapshotRecord;
-    } catch {
-      return null;
-    }
+    const hash = await this.redis.hgetall(snapshotKey(tableId));
+    if (!hash || Object.keys(hash).length === 0) return null;
+    return reconstructSnapshotFromHash(hash as Record<string, string>);
   }
 
   async trimBefore(tableId: string, id: string): Promise<void> {

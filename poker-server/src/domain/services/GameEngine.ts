@@ -45,6 +45,7 @@ export class GameEngine {
   private raiseLocked = new Set<string>();
   handInProgress = false;
   private seq = 0;
+  private handId: string | null = null;
   /** 重连鉴权：playerId → 服务端签发的短期 reconnectToken（一次性，验证通过后立即轮换） */
   private reconnectTokens = new Map<string, string>();
   /** 重连重放：全手牌自增 seq 的广播事件历史 */
@@ -135,6 +136,7 @@ export class GameEngine {
       savedAt: new Date().toISOString(),
       state: this.street,
       handInProgress: this.handInProgress,
+      handId: this.handId,
       button: this.button,
       currentBet: this.currentBet,
       minRaiseInc: this.minRaiseInc,
@@ -161,6 +163,7 @@ export class GameEngine {
       this.seats = s.seats as EngineSeat[];
       this.street = s.state as HandState;
       this.handInProgress = Boolean(s.handInProgress);
+      this.handId = typeof s.handId === 'string' ? s.handId : null;
       this.button = Number(s.button);
       this.currentBet = Number(s.currentBet);
       this.minRaiseInc = Number(s.minRaiseInc);
@@ -213,6 +216,7 @@ export class GameEngine {
 
     // 可验证公平：混合熵洗牌 + 逐张承诺
     const handId = randomUUID();
+    this.handId = handId;
     const serverSeed = randomBytes(32);
     const key = deriveShuffleKey(serverSeed, handId, this.seats.map(s => s.clientSeed));
     this.shuffleKey = key;

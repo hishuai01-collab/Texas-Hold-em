@@ -1,4 +1,5 @@
 import { computed, reactive, ref } from 'vue'
+import { soundStore } from '../lib/sound'
 import type { Card, ClientPayload, SeatView, ServerEvent, ServerMsg } from '../types/protocol'
 
 export type ConnectionStatus = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING'
@@ -59,7 +60,10 @@ const playerId = ref<string | null>(localStorage.getItem(storageKeys.playerId))
 const reconnectToken = ref<string | null>(localStorage.getItem(storageKeys.reconnectToken))
 const playerName = ref(storedName)
 const tableId = ref('default')
+const inviteCapability = ref<string | null>(null)
 const actionVersion = ref(0)
+const showdownVersion = ref(0)
+const showdownWinnings = ref<Record<string, number>>({})
 /** 断线重连期间冻结 UI 交互 */
 const frozen = ref(false)
 /** 错误追踪号，用于 Toast 显示唯一标识 */
@@ -79,6 +83,7 @@ function resetHand(): void {
   state.street = 'PREFLOP'
   state.actionRequest = null
   state.auditRoot = null
+  showdownWinnings.value = {}
 }
 
 function setSeats(seats: SeatView[]): void {
@@ -92,7 +97,9 @@ function addLog(event: ServerEvent): void {
 }
 
 function acceptsSequence(event: ServerEvent): boolean {
-  if (!('seq' in event) || event.type === 'JOINED' || event.type === 'PLAYER_JOINED') return true
+  // Action requests can intentionally share a transport sequence with the
+  // preceding state event. They must refresh the betting panel every time.
+  if (!('seq' in event) || event.type === 'JOINED' || event.type === 'PLAYER_JOINED' || event.type === 'ACTION_REQUIRED') return true
   if (event.type === 'HAND_STARTED') {
     lastSeq.value = event.seq
     return true
@@ -102,9 +109,33 @@ function acceptsSequence(event: ServerEvent): boolean {
   return true
 }
 
+function releaseFrozen(): void {
+  frozen.value = false
+}
+
+function playEventSound(event: ServerEvent): void {
+  switch (event.type) {
+    case 'PRIVATE_CARDS':
+      soundStore.play('deal')
+      break
+    case 'STREET':
+      soundStore.play('street')
+      break
+    case 'ACTION_APPLIED': {
+      const actionSounds = { CHECK: 'check', FOLD: 'fold', CALL: 'call', RAISE: 'raise', ALL_IN: 'raise' } as const
+      const sound = actionSounds[event.action as keyof typeof actionSounds]
+      if (sound) soundStore.play(sound)
+      break
+    }
+    case 'SHOWDOWN':
+      if (playerId.value) soundStore.play((event.winnings[playerId.value] ?? 0) > 0 ? 'win' : 'lose')
+      break
+  }
+}
+
 /** The only game-state writer: fold each uppercase server event into local state. */
-function reduce(event: ServerEvent): void {
-  if (!acceptsSequence(event)) return
+function reduce(event: ServerEvent, replaying = false): boolean {
+  if (!acceptsSequence(event)) return false
   addLog(event)
 
     switch (event.type) {
@@ -114,11 +145,13 @@ function reduce(event: ServerEvent): void {
         localStorage.setItem(storageKeys.playerId, event.you)
         localStorage.setItem(storageKeys.reconnectToken, event.reconnectToken)
         setSeats(event.seats)
+        releaseFrozen()
         break
       case 'RECONNECTED':
         reconnectToken.value = event.reconnectToken
         localStorage.setItem(storageKeys.reconnectToken, event.reconnectToken)
         setSeats(event.seats)
+        releaseFrozen()
         break
     case 'HAND_STARTED':
       resetHand()
@@ -137,6 +170,9 @@ function reduce(event: ServerEvent): void {
     case 'ACTION_REQUIRED':
       state.actionRequest = event
       actionVersion.value += 1
+      break
+    case 'PLAYER_JOINED':
+      setSeats(event.seats)
       break
     case 'PLAYER_LEFT':
       setSeats(event.seats)
@@ -157,6 +193,8 @@ function reduce(event: ServerEvent): void {
     case 'SHOWDOWN':
       state.street = 'SHOWDOWN'
       state.actionRequest = null
+      showdownWinnings.value = { ...event.winnings }
+      showdownVersion.value += 1
       state.revealedCards = Object.fromEntries(
         Object.entries(event.reveals).map(([id, cards]) => [id, cards.map(({ card }) => card)]),
       )
@@ -180,6 +218,8 @@ function reduce(event: ServerEvent): void {
         }
         break
   }
+  if (!replaying) playEventSound(event)
+  return true
 }
 
 function handleMessage(payload: string): void {
@@ -193,9 +233,9 @@ function handleMessage(payload: string): void {
     message.events
       .slice()
       .sort((a, b) => ('seq' in a ? a.seq : -1) - ('seq' in b ? b.seq : -1))
-      .forEach(reduce)
+      .forEach((event) => reduce(event, true))
     // 重放完毕 → 解冻
-    frozen.value = false
+    releaseFrozen()
     return
   }
   reduce(message)
@@ -211,7 +251,9 @@ function socketUrl(): string {
   const base = import.meta.env.VITE_POKER_WS_URL ?? `ws://${window.location.hostname || 'localhost'}:8080`
   const separator = base.includes('?') ? '&' : '?'
   const tid = tableId.value.trim() || 'default'
-  return `${base}${separator}tableId=${encodeURIComponent(tid)}`
+  const invite = inviteCapability.value
+  const inviteParam = invite ? `&invite=${encodeURIComponent(invite)}` : ''
+  return `${base}${separator}tableId=${encodeURIComponent(tid)}${inviteParam}`
 }
 
 function scheduleReconnect(): void {
@@ -223,14 +265,15 @@ function scheduleReconnect(): void {
   state.eventLog = [] // preserve player identity and hand snapshot, clear connection-local diagnostics
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
-    connect()
+    connect(playerName.value, tableId.value, inviteCapability.value)
   }, delay)
 }
 
-function connect(name = playerName.value, requestedTableId = tableId.value): void {
+function connect(name = playerName.value, requestedTableId = tableId.value, requestedInvite: string | null = null): void {
   disposed = false
   playerName.value = name.trim() || 'Player'
   tableId.value = requestedTableId.trim() || 'default'
+  inviteCapability.value = requestedInvite
   localStorage.setItem(storageKeys.name, playerName.value)
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return
 
@@ -278,6 +321,8 @@ export const pokerStore = {
   playerName,
   tableId,
   actionVersion,
+  showdownVersion,
+  showdownWinnings,
   frozen,
   errorCode,
   reconnectAttempt,

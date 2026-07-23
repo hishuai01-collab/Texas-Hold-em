@@ -10,7 +10,7 @@
  *  - maxVisual : 最多可视堆叠枚数（默认 10）
  *  - duration  : 动画持续 ms（默认 500）
  */
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -174,21 +174,21 @@ onUnmounted(() => { if (rafId) cancelAnimationFrame(rafId) })
   height: 9px;
   border-radius: 50%;
   background:
-    repeating-conic-gradient(#7a1230 0deg 30deg, #b3182f 30deg 60deg) border-box;
-  border: 1.5px solid #e8bd4e; /* gold rim */
+    repeating-conic-gradient(#3f3f46 0deg 30deg, #52525b 30deg 60deg) border-box;
+  border: 1.5px solid #a1a1aa;
   box-shadow:
     inset 0 -1px 1px rgba(0,0,0,.5),
     0 1px 2px rgba(0,0,0,.4);
   will-change: transform, opacity;
 }
-/* 内圈金色装饰线 */
+/* 内圈装饰线 */
 .chip::after {
   content: '';
   position: absolute;
   inset: 2px;
   border-radius: 50%;
-  border: 1px dashed #f6e3ab;
-  opacity: .55;
+  border: 1px dashed rgba(226,232,240,.35);
+  opacity: .7;
 }
 .flyout {
   pointer-events: none;
@@ -197,9 +197,9 @@ onUnmounted(() => { if (rafId) cancelAnimationFrame(rafId) })
   margin-top: 2px;
   font-size: 9px;
   font-weight: 600;
-  color: #f0d27a;             /* gold-300 */
-  background: #111827;        /* gray-900 */
-  border: 1px solid #8a6620;  /* gold-700 */
+  color: #e5e5e5;
+  background: #111827;
+  border: 1px solid #52525b;
   border-radius: 999px;
   padding: 0 5px;
   line-height: 14px;

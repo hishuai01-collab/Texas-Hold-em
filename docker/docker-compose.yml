@@ -1,4 +1,19 @@
+# 德州扑克全栈一键启动：Redis + PostgreSQL + poker-server + client + Prometheus + Grafana
+#
+# 启动方式：
+#   docker compose up -d
+#
+# 访问：
+#   - 前端: http://localhost:5173
+#   - Grafana: http://localhost:3000 (admin/admin)
+#   - Prometheus: http://localhost:9090
+#
+# 构建前端镜像前需先执行：
+#   cd ../client && npm ci && npm run build
+
 services:
+  # ── 基础设施 ──
+
   redis:
     image: redis:7.2-alpine
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
@@ -12,6 +27,78 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+    networks:
+      - poker-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: poker
+      POSTGRES_USER: poker
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-poker_dev_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - poker-net
+
+  # ── 后端服务 ──
+
+  poker-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    image: poker-server:latest
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      HTTP_API_PORT: 8081
+      METRICS_PORT: 9091
+      REDIS_URL: redis://redis:6379/0
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      ADMIN_TG_ID: ${ADMIN_TG_ID:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      BOTS: ${BOTS:-0}
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "9091:9091"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - poker-net
+
+  # ── 前端（Nginx 静态托管） ──
+
+  client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.client
+    image: poker-client:latest
+    environment:
+      VITE_POKER_WS_URL: ws://localhost:8080
+      VITE_API_BASE_URL: http://localhost:8081
+    ports:
+      - "5173:80"
+    depends_on:
+      - poker-server
+    restart: unless-stopped
+    networks:
+      - poker-net
+
+  # ── 可观测性 ──
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -20,16 +107,16 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     depends_on:
-      - redis
+      - poker-server
     restart: unless-stopped
+    networks:
+      - poker-net
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -47,8 +134,15 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+    networks:
+      - poker-net
 
 volumes:
   redis-data:
+  postgres-data:
   prometheus-data:
   grafana-data:
+
+networks:
+  poker-net:
+    driver: bridge

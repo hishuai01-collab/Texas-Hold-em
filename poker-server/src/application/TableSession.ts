@@ -20,6 +20,9 @@ export interface TableSessionDeps {
 
 interface BufferedEvent { msg: ServerMsg; privateTo?: string }
 
+const ACTION_TIMEOUT_MS = Number(process.env.ACTION_TIMEOUT_MS ?? 15_000);
+const DISCONNECTED_TIME_BANK_MS = Number(process.env.DISCONNECTED_TIME_BANK_MS ?? 15_000);
+
 /**
  * 单桌运行时：把 GameEngine（纯同步、对 Redis 无感知）与持久化/投递编排在一起。
  * 每条命令走 mutate（同步）→ persist（Redis，异步）→ deliver（socket/计时器/机器人，同步）
@@ -47,13 +50,15 @@ export class TableSession {
       onBreakerTrip: () => deps.onBreakerTrip?.(deps.tableId),
     });
     this.timeoutManager = new TimeoutManager({
+      actionMs: ACTION_TIMEOUT_MS,
+      disconnectedTimeBankMs: DISCONNECTED_TIME_BANK_MS,
       onTimeout: ({ playerId, toCall }) => this.runCommand(() => {
         if (this.engine.autoAct(playerId)) {
           this.deps.metrics.actionTimeouts.inc();
           console.warn(JSON.stringify({ type: 'AFK_AUTO_ACTION', tableId: this.tableId, playerId, action: toCall > 0 ? 'FOLD' : 'CHECK', at: new Date().toISOString() }));
         }
       }),
-      onTimeBankStarted: ({ playerId }) => console.info(JSON.stringify({ type: 'TIME_BANK_STARTED', tableId: this.tableId, playerId, seconds: 15 })),
+      onTimeBankStarted: ({ playerId }) => console.info(JSON.stringify({ type: 'TIME_BANK_STARTED', tableId: this.tableId, playerId, seconds: Math.ceil(DISCONNECTED_TIME_BANK_MS / 1000) })),
     });
     this.engine = new GameEngine(
       (msg, privateTo) => this.pendingEvents.push({ msg, privateTo }),
@@ -97,8 +102,21 @@ export class TableSession {
     this.pendingEvents.push({ msg, privateTo });
   }
 
+  async getReplayFor(playerId: string, lastSeq: number): Promise<ServerMsg[]> {
+    const memReplay = this.engine.getReplay(playerId, lastSeq);
+    if (memReplay.length > 0) return memReplay;
+    const snapshot = await this.deps.eventStore.readSnapshot(this.tableId);
+    const afterId = snapshot?.streamCursor ?? '0';
+    const allEvents = await this.deps.eventStore.readEventsAfter(this.tableId, afterId);
+    return allEvents
+      .filter(e => (e.msg as { seq: number }).seq > lastSeq)
+      .filter(e => !e.privateTo || e.privateTo === playerId)
+      .sort((a, b) => (a.msg as { seq: number }).seq - (b.msg as { seq: number }).seq)
+      .map(e => e.msg as ServerMsg);
+  }
+
   /** 把一段同步引擎变更包装为「变更→持久化→投递」的整体 Job，交给 TableActor 串行执行。 */
-  runCommand(fn: () => void): void {
+  runCommand(fn: () => void | Promise<void>): void {
     this.touch();
     this.actor.run(async () => {
       this.pendingEvents = [];

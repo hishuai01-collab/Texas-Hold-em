@@ -1,0 +1,46 @@
+# ── poker-server Dockerfile ──
+# 多阶段构建：编译阶段 → 运行阶段（最小镜像）
+# 构建上下文为项目根目录（包含 poker-server/ 和 docker/）
+#
+# 构建方式：
+#   docker build -t poker-server -f docker/Dockerfile.server .
+
+# ---- Build Stage ----
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# context 为项目根目录，所有路径相对于根目录
+COPY poker-server/package.json poker-server/package-lock.json ./
+RUN npm ci
+
+# 复制源码并编译
+COPY poker-server/tsconfig.json ./tsconfig.json
+COPY poker-server/src/ ./src/
+RUN npm run build
+
+# ---- Runtime Stage ----
+FROM node:22-alpine
+
+WORKDIR /app
+
+# 安装 PM2
+RUN npm install -g pm2
+
+# 复制编译产物和运行时依赖
+COPY --from=builder /app/dist/ ./dist/
+COPY --from=builder /app/node_modules/ ./node_modules/
+COPY poker-server/package.json ./
+COPY poker-server/ecosystem.config.js ./
+COPY poker-server/scripts/ ./scripts/
+
+RUN chmod +x ./scripts/env-check.sh
+
+# 健康检查
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8081/healthz || exit 1
+
+EXPOSE 8080 8081 9091
+
+# 启动前先校验环境变量
+CMD ["sh", "-c", "bash scripts/env-check.sh && pm2-runtime start ecosystem.config.js --only poker-server"]

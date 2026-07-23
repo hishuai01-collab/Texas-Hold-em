@@ -88,6 +88,8 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.ACTIONS_DEPLOY_KNOWN_HOSTS }}
         run: |
+          set -eu
+          # 验证密钥和主机指纹非空
           test -n "$SSH_PRIVATE_KEY" || { echo "::error::Missing ACTIONS_DEPLOY_KEY"; exit 1; }
           test -n "$SSH_KNOWN_HOSTS" || { echo "::error::Missing ACTIONS_DEPLOY_KNOWN_HOSTS"; exit 1; }
           install -d -m 700 ~/.ssh
@@ -95,6 +97,12 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          # 验证 SSH 密钥格式（Ed25519 私钥以 "-----BEGIN OPENSSH PRIVATE KEY-----" 开头）
+          grep -q "BEGIN OPENSSH PRIVATE KEY\|BEGIN PRIVATE KEY" ~/.ssh/id_ed25519 || { echo "::error::SSH 私钥格式无效（非 OPENSSH/标准 PEM）"; exit 1; }
+          # 验证 known_hosts 格式（应包含主机名或 IP + 密钥类型）
+          grep -qE "^[^ ]+ (ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ssh-ed448) " ~/.ssh/known_hosts || { echo "::error::SSH known_hosts 格式无效"; exit 1; }
+          # 验证 SSH 连接可用（超时 10s，不做完整登录）
+          ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o BatchMode=yes "$PROD_USER@$PROD_HOST" "echo 'SSH connection verified'" || { echo "::error::SSH 连接验证失败——请检查 PROD_HOST/PROD_USER 与密钥是否匹配"; exit 1; }
 
       - name: Upload release artifacts (rsync incremental)
         env:

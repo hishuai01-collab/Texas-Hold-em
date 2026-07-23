@@ -20,12 +20,12 @@ watch(
 
 <template>
   <div class="relative inline-flex items-baseline gap-1.5">
-    <span class="text-xs font-bold tracking-[.35em] text-gold-200/70">{{ street }}</span>
+    <span class="text-xs font-bold tracking-[.35em] text-gray-400">{{ street }}</span>
     <span
-      class="text-xl font-black tracking-wide text-gold-300"
+      class="text-xl font-black tracking-wide text-gray-300"
       :class="{ 'animate-pot-pop': animating }"
     >
-      底池 <span class="tabular-nums text-gold-200">{{ pot.toLocaleString() }}</span>
+      底池 <span class="tabular-nums text-gray-200">{{ pot.toLocaleString() }}</span>
     </span>
   </div>
 </template>

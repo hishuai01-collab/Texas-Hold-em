@@ -48,3 +48,10 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Run E2E flow test (requires Redis)
+        working-directory: poker-server
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: |
+          npm run test:e2e

@@ -43,8 +43,8 @@ const boardCardStyle = (index: number) => ({
 <template>
   <section class="relative min-h-[520px] overflow-hidden rounded-[3rem] border-[14px] border-[#1c1108] p-3 sm:min-h-[620px] bg-gradient-to-b from-[#241609] to-[#160d05] shadow-felt">
     <!-- 桌面背景：绒面墨绿 + 金色滚边 -->
-    <div class="absolute inset-0 rounded-[2.2rem] border-2 border-gold-500/70 bg-[radial-gradient(ellipse_at_center,_theme(colors.felt.600)_0%,_theme(colors.felt.800)_55%,_theme(colors.felt.950)_100%)] shadow-felt" />
-    <div class="absolute left-1/2 top-1/2 h-[44%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-gold-400/40 bg-black/10 shadow-inner" />
+    <div class="absolute inset-0 rounded-[2.2rem] border-2 border-gray-500/70 bg-[radial-gradient(ellipse_at_center,_theme(colors.felt.600)_0%,_theme(colors.felt.800)_55%,_theme(colors.felt.950)_100%)] shadow-felt" />
+    <div class="absolute left-1/2 top-1/2 h-[44%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-gray-400/40 bg-black/10 shadow-inner" />
 
     <!-- 中央信息区 -->
     <div class="absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 text-center">
@@ -61,7 +61,7 @@ const boardCardStyle = (index: number) => ({
           :style="boardCardStyle(index)"
         />
       </TransitionGroup>
-      <p v-if="board.length === 0" class="mt-8 text-sm text-gold-200/60">等待翻牌</p>
+       <p v-if="board.length === 0" class="mt-8 text-sm text-gray-500/80">等待翻牌</p>
     </div>
 
     <!-- 动态座位 -->
@@ -81,7 +81,7 @@ const boardCardStyle = (index: number) => ({
     </div>
 
     <!-- 空状态 -->
-    <p v-if="seats.length === 0" class="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 translate-y-24 text-sm text-gold-200/60">牌桌空无一人，等待玩家加入…</p>
+     <p v-if="seats.length === 0" class="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 translate-y-24 text-sm text-gray-500/80">牌桌空无一人，等待玩家加入…</p>
   </section>
 </template>
 

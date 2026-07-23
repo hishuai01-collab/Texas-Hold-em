@@ -235,3 +235,17 @@ test('受保护快照可恢复进行中牌局与当前行动者', () => {
   assert.equal(restored.activePlayer, engine.activePlayer);
   assert.deepEqual(restored.views(), engine.views());
 });
+
+test('快照包含 handId，恢复后保留 handId', () => {
+  const { engine } = makeEngine();
+  engine.addPlayer('A', 'A', 'seed-a');
+  engine.addPlayer('B', 'B', 'seed-b');
+  engine.startHand();
+  const snapshot = engine.snapshot() as any;
+  assert.ok(snapshot.handId, '快照应包含 handId');
+
+  const restored = new GameEngine(() => undefined);
+  assert.equal(restored.restore(snapshot), true);
+  const restoredSnap = restored.snapshot() as any;
+  assert.equal(restoredSnap.handId, snapshot.handId, '恢复后 handId 应与快照一致');
+});

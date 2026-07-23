@@ -51,7 +51,7 @@ export type ServerMsg =
   | { type: 'REFUND'; seq: number; playerId: string; amount: number }
   | { type: 'SHOWDOWN'; seq: number; pots: Pot[]; reveals: Record<string, CardReveal[]>; winnings: Record<string, number>; seats: SeatView[] }
   | { type: 'HAND_ENDED'; seq: number; auditRoot: string; eventCount: number }
-  // 结构化错误：code 为前端可识别的枚举错误码，message 为用户语言文案（绝不暴露后端字段/栈）
-  | { type: 'ERROR'; code?: string; message: string }
+  // 结构化错误：code 为前端可识别的错误码枚举，message 为用户语言文案，traceId 用于排查
+   | { type: 'ERROR'; code?: string; message: string; traceId: string }
   // 断线重连：一次性重放 seq > lastSeq 的所有事件（含重连者私有事件）
   | { type: 'EVENT_REPLAY'; events: ServerMsg[] };

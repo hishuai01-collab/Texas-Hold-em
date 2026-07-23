@@ -26,19 +26,19 @@ onUnmounted(() => {
   <Transition name="offline">
     <div
       v-if="!online"
-      class="fixed inset-0 z-[100] flex min-h-screen items-center justify-center bg-[#080d18] px-6 text-slate-100"
+      class="fixed inset-0 z-[100] flex min-h-screen items-center justify-center bg-[var(--color-canvas)] px-6 text-slate-100"
       role="status"
       aria-live="assertive"
     >
-      <div class="w-full max-w-md border border-slate-700 bg-slate-950 p-6 font-mono shadow-2xl">
+      <div class="ui-panel w-full max-w-md p-6 font-mono">
         <div class="flex items-center gap-3 text-xs tracking-[.24em] text-slate-500">
           <span class="h-2 w-2 animate-pulse bg-rose-400" />
-          NETWORK STATUS
+          网络状态
         </div>
-        <p class="mt-8 text-2xl font-semibold tracking-tight text-white">DISCONNECTED</p>
-        <p class="mt-2 text-sm text-slate-500">RETRYING...</p>
+        <p class="mt-8 text-2xl font-semibold tracking-tight text-white">网络已断开</p>
+        <p class="mt-2 text-sm text-slate-500">正在重试…</p>
         <div class="mt-8 h-px w-full bg-slate-800" />
-        <p class="mt-4 text-xs text-slate-600">Waiting for the network to come back online.</p>
+        <p class="mt-4 text-xs text-slate-600">网络恢复后将自动重新连接。</p>
       </div>
     </div>
   </Transition>

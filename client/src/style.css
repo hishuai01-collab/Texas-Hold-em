@@ -2,10 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #f3f4f6; background: #030712; font-synthesis: none; text-rendering: optimizeLegibility; }
+:root {
+  --color-canvas: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-raised: #1a1a1a;
+  --color-border: #2a2a2a;
+  --color-border-strong: #3f3f3f;
+  --color-text: #f5f5f4;
+  --color-text-muted: #a3a3a3;
+  --color-text-subtle: #737373;
+  --color-danger: #e05a47;
+  --color-success: #78b35a;
+  --color-info: #89a8c8;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-panel: 0 16px 40px rgba(0, 0, 0, .35);
+  --shadow-float: 0 24px 64px rgba(0, 0, 0, .5);
+  --shadow-focus: 0 0 0 3px rgba(148, 163, 184, .28);
+  --font-display: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
+body { margin: 0; min-width: 320px; background: radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--color-text-muted) 8%, transparent), transparent 34%), var(--color-canvas); }
 button, input { font: inherit; }
+
+/* 当视频背景激活时，页面背景使用纯色（视频通过遮罩层提供背景） */
+.has-video-bg .ui-page { background: var(--color-canvas); }
+.has-video-bg body { background: var(--color-canvas); }
+
+.ui-page { min-height: 100vh; background: radial-gradient(circle at 10% 4%, color-mix(in srgb, var(--color-text-muted) 6%, transparent), transparent 28%), radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--color-text-subtle) 5%, transparent), transparent 26%), linear-gradient(145deg, var(--color-surface-raised), var(--color-canvas) 62%); color: var(--color-text); }
+.ui-panel { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.ui-button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; border: 1px solid transparent; border-radius: var(--radius-md); padding: 0 12px; font-weight: 700; transition: transform 120ms ease, opacity 120ms ease, background 120ms ease; }
+.ui-button:hover:not(:disabled) { transform: translateY(-1px); }
+.ui-button:focus-visible, .ui-input:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.ui-button:disabled { cursor: not-allowed; opacity: .45; }
+.ui-button--primary { background: #e5e5e5; color: #0a0a0a; }
+.ui-button--primary:hover:not(:disabled) { background: #ffffff; }
+.ui-button--neutral { border-color: var(--color-border); background: var(--color-surface-raised); color: var(--color-text-muted); }
+.ui-button--danger { border-color: color-mix(in srgb, var(--color-danger) 55%, transparent); background: color-mix(in srgb, var(--color-danger) 18%, var(--color-surface)); color: var(--color-text); }
+.ui-input { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); color: var(--color-text); }
+
+@media (max-width: 992px) { .table-layout { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .table-scroll { margin-inline: -12px; padding-inline: 12px; } }
+@media (max-width: 480px) { .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; } .table-scroll > * { min-width: 320px; } }
+.narrow-screen-note { display: none; }
+@media (max-width: 480px) { .narrow-screen-note { display: block; margin: 0 0 8px; color: var(--color-text-subtle); font-size: 11px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
+}
 
 /* ── 骨架屏脉冲 ── */
 @keyframes skeleton-pulse {
@@ -50,8 +103,8 @@ button, input { font: inherit; }
 }
 
 .animate-skeleton { animation: skeleton-pulse 1.8s ease-in-out infinite; }
-.animate-chip-up { animation: chip-count-up .35s ease-out; }
-.animate-pot-pop { animation: pot-pop .35s cubic-bezier(.34,1.56,.64,1); }
+.animate-chip-up { animation: chip-count-up .35s ease-out; will-change: transform, opacity; }
+.animate-pot-pop { animation: pot-pop .35s cubic-bezier(.34,1.56,.64,1); will-change: transform; }
 .animate-toast-in { animation: toast-in .4s cubic-bezier(.16,1,.3,1) forwards; }
 .animate-toast-out { animation: toast-out .3s ease-in forwards; }
-.animate-card-fly { animation: card-fly-in .45s cubic-bezier(.2,.8,.2,1) forwards; }
+.animate-card-fly { animation: card-fly-in .45s cubic-bezier(.2,.8,.2,1) forwards; will-change: transform, opacity; }

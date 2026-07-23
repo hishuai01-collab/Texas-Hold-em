@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Video background assets (large binary files, add your own)
+public/videos/*.mp4
+public/videos/*.webm
+public/videos/*.mov
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

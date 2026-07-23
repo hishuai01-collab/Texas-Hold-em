@@ -38,9 +38,9 @@ watch(
   <article
     class="relative w-32 rounded-2xl border px-3 py-2 text-left shadow-lg transition duration-300 sm:w-40"
     :class="[
-      seat.folded ? 'border-gray-800 bg-gray-950/70 opacity-45 grayscale' : 'border-gold-700/50 bg-gray-950/90',
-      isMe ? 'ring-2 ring-gold-400/70' : '',
-      isActing ? 'seat-active border-gold-400 bg-gray-900 ring-2 ring-gold-400' : '',
+      seat.folded ? 'border-gray-800 bg-gray-950/70 opacity-45 grayscale' : 'border-gray-700/50 bg-gray-950/90',
+      isMe ? 'ring-2 ring-gray-400/70' : '',
+      isActing ? 'seat-active border-gray-400 bg-gray-900 ring-2 ring-gray-400' : '',
     ]"
   >
     <!-- 行动倒计时圆环 -->
@@ -53,13 +53,13 @@ watch(
         :class="seat.folded ? 'bg-gray-600' : seat.allIn ? 'bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,.8)]' : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.7)]'"
       />
       <p class="truncate text-sm font-bold text-gray-100">
-        {{ seat.name }}<span v-if="isMe" class="ml-1 text-gold-300">你</span>
+        {{ seat.name }}<span v-if="isMe" class="ml-1 text-gray-300">你</span>
       </p>
     </div>
 
     <!-- 筹码 -->
     <p
-      class="mt-1 text-xs tabular-nums text-gold-200"
+      class="mt-1 text-xs tabular-nums text-gray-300"
       :class="{ 'animate-chip-up': chipsAnimating }"
     >
       筹码 {{ seat.chips.toLocaleString() }}

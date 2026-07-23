@@ -82,16 +82,17 @@
   z-index: 100;
 }
 
-/* 金色粒子 */
+/* 白色粒子 */
 .win-particle {
   position: absolute;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fcd34d;
-  box-shadow: 0 0 6px rgba(252, 211, 77, 0.6);
+  background: #e5e5e5;
+  box-shadow: 0 0 6px rgba(226, 232, 240, 0.35);
   animation: win-particle-fall var(--fall-duration, 2s) linear forwards;
   animation-delay: var(--fall-delay, 0s);
+  will-change: transform, opacity;
 }
 
 @keyframes win-particle-fall {
@@ -115,7 +116,7 @@
   left: var(--beam-x, 50%);
   width: 4px;
   height: 0;
-  background: linear-gradient(to top, transparent, rgba(252, 211, 77, 0.6), transparent);
+  background: linear-gradient(to top, transparent, rgba(226, 232, 240, 0.5), transparent);
   animation: win-beam-rise 1.2s ease-out forwards;
   animation-delay: var(--beam-delay, 0s);
   transform-origin: bottom center;
@@ -140,7 +141,7 @@
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(252, 211, 77, 0.15), transparent 70%);
+  background: radial-gradient(circle, rgba(226, 232, 240, 0.12), transparent 70%);
   transform: translate(-50%, -50%);
   animation: win-glow-pulse 1.5s ease-in-out infinite alternate;
 }
@@ -164,14 +165,15 @@
   transform: translate(-50%, -50%);
   font-size: 3rem;
   font-weight: 900;
-  color: #fcd34d;
+  color: #f5f5f4;
   text-shadow:
-    0 0 20px rgba(252, 211, 77, 0.6),
-    0 0 60px rgba(252, 211, 77, 0.3),
+    0 0 20px rgba(226, 232, 240, 0.5),
+    0 0 60px rgba(226, 232, 240, 0.25),
     0 2px 4px rgba(0, 0, 0, 0.5);
   animation: win-title-reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   opacity: 0;
   letter-spacing: 0.1em;
+  will-change: transform, opacity;
 }
 
 @keyframes win-title-reveal {
@@ -193,12 +195,13 @@
   transform: translate(-50%, -50%);
   font-size: 1.5rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--color-text);
   text-shadow:
-    0 0 12px rgba(252, 211, 77, 0.4),
+    0 0 12px rgba(226, 232, 240, 0.35),
     0 2px 4px rgba(0, 0, 0, 0.5);
   animation: win-amount-appear 0.6s ease-out 0.4s forwards;
   opacity: 0;
+  will-change: transform, opacity;
 }
 
 @keyframes win-amount-appear {
@@ -220,7 +223,7 @@
   max-height: 240px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
 
 .action-log::-webkit-scrollbar {
@@ -232,12 +235,12 @@
 }
 
 .action-log::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
+  background: rgba(148, 163, 184, 0.25);
   border-radius: 999px;
 }
 
 .action-log::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.5);
+  background: rgba(148, 163, 184, 0.45);
 }
 
 /* 时间轴条目 */
@@ -253,7 +256,7 @@
 }
 
 .action-log-item:hover {
-  background: rgba(212, 175, 55, 0.06);
+  background: rgba(148, 163, 184, 0.06);
 }
 
 /* 时间轴圆点 */
@@ -263,7 +266,7 @@
   height: 8px;
   margin-top: 5px;
   border-radius: 50%;
-  background: rgba(212, 175, 55, 0.5);
+  background: rgba(148, 163, 184, 0.45);
   position: relative;
 }
 
@@ -275,7 +278,7 @@
   left: 50%;
   height: calc(100% + 12px);
   width: 1px;
-  background: rgba(212, 175, 55, 0.15);
+  background: rgba(148, 163, 184, 0.14);
   transform: translateX(-50%);
 }
 
@@ -286,7 +289,7 @@
 /* 时间轴标签 */
 .action-log-label {
   font-weight: 600;
-  color: #fcd34d;
+  color: #e5e5e5;
 }
 
 .action-log-detail {
@@ -305,9 +308,9 @@
    4. 通用视觉效果工具类
    ════════════════════════════════════════ */
 
-/* 金色渐变文本 */
+/* 中性渐变文本 */
 .text-gold-gradient {
-  background: linear-gradient(135deg, #fcd34d, #d4af37, #fcd34d);
+  background: linear-gradient(135deg, #f5f5f4, #a3a3a3, #f5f5f4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -316,12 +319,12 @@
 /* 发光边框动画 */
 @keyframes border-glow-pulse {
   0%, 100% {
-    border-color: rgba(212, 175, 55, 0.3);
-    box-shadow: 0 0 8px rgba(212, 175, 55, 0.1);
+    border-color: rgba(148, 163, 184, 0.25);
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.08);
   }
   50% {
-    border-color: rgba(212, 175, 55, 0.6);
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+    border-color: rgba(148, 163, 184, 0.5);
+    box-shadow: 0 0 20px rgba(148, 163, 184, 0.15);
   }
 }
 

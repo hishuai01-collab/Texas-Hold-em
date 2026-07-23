@@ -11,12 +11,32 @@ export interface AdminBotDependencies {
   connectionCount: () => number;
 }
 
+/**
+ * RBAC 角色定义。
+ * admin: 全部命令可用（/status /ban /unban /health /shutdown /broadcast）
+ * operator: 仅查看类命令（/status /health）
+ * admin 由 ADMIN_TG_ID 唯一标识。
+ */
+type Role = 'admin' | 'viewer';
+
+export interface AdminUser {
+  tgId: string;
+  role: Role;
+  name?: string;
+}
+
 export interface TelegramAdminBotOptions {
   botToken: string;
   adminTgId: string;
+  /** 可选：额外允许的管理员列表 */
+  extraAdmins?: AdminUser[];
   deps: AdminBotDependencies;
   pollIntervalMs?: number;
 }
+
+/** 命令权限映射：admin 可执行所有命令，viewer 仅可执行查看类命令。 */
+const ADMIN_ONLY_COMMANDS = new Set(['/ban', '/unban', '/shutdown', '/broadcast']);
+const VIEWER_COMMANDS = new Set(['/status', '/health']);
 
 export class TelegramAdminBot {
   private readonly botToken: string;
@@ -24,6 +44,7 @@ export class TelegramAdminBot {
   private readonly deps: AdminBotDependencies;
   private readonly pollIntervalMs: number;
   private readonly baseUrl: string;
+  private readonly extraAdmins: AdminUser[];
   private running = false;
   private offset = 0;
 
@@ -33,12 +54,23 @@ export class TelegramAdminBot {
     this.deps = opts.deps;
     this.pollIntervalMs = opts.pollIntervalMs ?? 2_000;
     this.baseUrl = `https://api.telegram.org/bot${this.botToken}`;
+    this.extraAdmins = opts.extraAdmins ?? [];
   }
 
   static async startAdminBot(opts: TelegramAdminBotOptions): Promise<() => void> {
     const bot = new TelegramAdminBot(opts);
     await bot.run();
     return () => { bot.running = false; };
+  }
+
+  /** 检查用户是否具有执行命令的权限。 */
+  private getUserRole(userId: string): Role | null {
+    // 主管理员始终为 admin
+    if (userId === this.adminTgId) return 'admin';
+    // 检查额外授权列表
+    const extra = this.extraAdmins.find(a => a.tgId === userId);
+    if (extra) return extra.role;
+    return null;
   }
 
   private async run(): Promise<void> {
@@ -60,7 +92,13 @@ export class TelegramAdminBot {
       signal: AbortSignal.timeout(35_000),
     });
     if (!res.ok) return;
-    const data = (await res.json()) as { ok: boolean; result: Array<{ update_id: number; message?: { from?: { id: number }; text?: string; chat?: { id: number } } }> };
+    const data = (await res.json()) as {
+      ok: boolean;
+      result: Array<{
+        update_id: number;
+        message?: { from?: { id: number }; text?: string; chat?: { id: number } };
+      }>;
+    };
     if (!data.ok || !Array.isArray(data.result)) return;
     for (const update of data.result) {
       this.offset = update.update_id + 1;
@@ -68,14 +106,29 @@ export class TelegramAdminBot {
     }
   }
 
-  private async handle(update: { update_id: number; message?: { from?: { id: number }; text?: string; chat?: { id: number } } }): Promise<void> {
+  private async handle(update: {
+    update_id: number;
+    message?: { from?: { id: number }; text?: string; chat?: { id: number } };
+  }): Promise<void> {
     const msg = update.message;
     if (!msg?.from?.id || !msg.text || !msg.chat) return;
-    if (String(msg.from.id) !== this.adminTgId) return;
+
+    const userId = String(msg.from.id);
+    const role = this.getUserRole(userId);
+    if (!role) return; // 未授权用户静默忽略
+
     const text = msg.text.trim();
     const chatId = msg.chat.id;
     const parts = text.split(/\s+/);
     const cmd = parts[0]?.toLowerCase();
+    if (!cmd || (!ADMIN_ONLY_COMMANDS.has(cmd) && !VIEWER_COMMANDS.has(cmd))) return;
+
+    // RBAC 权限校验：admin-only 命令需要 admin 角色
+    if (ADMIN_ONLY_COMMANDS.has(cmd) && role !== 'admin') {
+      await this.reply(chatId, `[FORBIDDEN] 命令 ${cmd} 需要管理员权限`);
+      return;
+    }
+
     let reply = '';
     switch (cmd) {
       case '/status':

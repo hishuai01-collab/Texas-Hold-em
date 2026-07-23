@@ -37,12 +37,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       headers: {
         Accept: 'application/json',
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(sessionStore.token.value ? { Authorization: `Bearer ${sessionStore.token.value}` } : {}),
         ...init.headers,
       },
       credentials: 'include',
     })
   } catch (error) {
-    toastStore.push('NETWORK ERROR — request failed', 'error')
+    toastStore.push('网络请求失败，请检查连接后重试。', 'error')
     throw new ApiError('Network request failed', 0, error)
   }
 
@@ -50,7 +51,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       sessionStore.clear()
-      toastStore.push(response.status === 401 ? 'SESSION EXPIRED — SIGN IN REQUIRED' : 'ACCESS DENIED', 'error')
+      toastStore.push(response.status === 401 ? '登录状态已失效，请重新登录。' : '你没有执行此操作的权限。', 'error')
       window.dispatchEvent(new CustomEvent('auth:expired'))
     }
     const message = typeof body === 'object' && body !== null && 'message' in body

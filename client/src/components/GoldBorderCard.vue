@@ -61,9 +61,9 @@ const sizeClass = computed(() => `size-${props.size}`)
 /* ── 容器 ── */
 .gold-border-card {
   position: relative;
-  border: 1px solid rgba(212, 175, 55, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(20, 16, 8, 0.92), rgba(30, 24, 12, 0.88));
+  background: linear-gradient(135deg, rgba(17, 17, 17, 0.92), rgba(26, 26, 26, 0.88));
   backdrop-filter: blur(4px);
   transition: border-color 0.3s, box-shadow 0.3s;
 }
@@ -81,32 +81,32 @@ const sizeClass = computed(() => `size-${props.size}`)
 .glow-subtle {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.3),
-    0 0 6px rgba(212, 175, 55, 0.08);
+    0 0 6px rgba(148, 163, 184, 0.08);
 }
 .glow-medium {
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.35),
-    0 0 12px rgba(212, 175, 55, 0.12),
-    inset 0 0 20px rgba(212, 175, 55, 0.03);
+    0 0 12px rgba(148, 163, 184, 0.12),
+    inset 0 0 20px rgba(148, 163, 184, 0.03);
 }
 .glow-strong {
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.4),
-    0 0 24px rgba(212, 175, 55, 0.2),
-    inset 0 0 30px rgba(212, 175, 55, 0.05);
+    0 0 24px rgba(148, 163, 184, 0.2),
+    inset 0 0 30px rgba(148, 163, 184, 0.05);
 }
 
 .glow-medium,
 .glow-strong {
-  border-color: rgba(212, 175, 55, 0.5);
+  border-color: rgba(148, 163, 184, 0.45);
 }
 
-/* ── 金角装饰 ── */
+/* ── 角装饰 ── */
 .gold-corner {
   position: absolute;
   width: 16px;
   height: 16px;
-  border-color: rgba(212, 175, 55, 0.6);
+  border-color: rgba(148, 163, 184, 0.5);
   border-style: solid;
   pointer-events: none;
   opacity: 0.7;
@@ -149,7 +149,7 @@ const sizeClass = computed(() => `size-${props.size}`)
   gap: 12px;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 .gold-header-line {
@@ -158,8 +158,8 @@ const sizeClass = computed(() => `size-${props.size}`)
   background: linear-gradient(
     to right,
     transparent,
-    rgba(212, 175, 55, 0.4) 30%,
-    rgba(212, 175, 55, 0.4) 70%,
+    rgba(148, 163, 184, 0.35) 30%,
+    rgba(148, 163, 184, 0.35) 70%,
     transparent
   );
 }
@@ -170,7 +170,7 @@ const sizeClass = computed(() => `size-${props.size}`)
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #d4af37;
+  color: #e5e5e5;
   white-space: nowrap;
 }
 

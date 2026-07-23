@@ -45,7 +45,7 @@ export type ServerEvent =
   | { type: 'REFUND'; seq: number; playerId: string; amount: number }
   | { type: 'SHOWDOWN'; seq: number; pots: Pot[]; reveals: Record<string, CardReveal[]>; winnings: Record<string, number>; seats: SeatView[] }
   | { type: 'HAND_ENDED'; seq: number; auditRoot: string; eventCount: number }
-  | { type: 'ERROR'; message: string }
+  | { type: 'ERROR'; code?: string; message: string; traceId: string }
 
 export interface EventReplay {
   type: 'EVENT_REPLAY'
