@@ -27,6 +27,7 @@ jobs:
   build:
     name: Test & Build
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -50,8 +51,12 @@ jobs:
 
       - name: Build Vite client
         working-directory: client
+        env:
+          PROD_DOMAIN: ${{ vars.PROD_DOMAIN }}
         run: |
           npm ci
+          test -n "$PROD_DOMAIN" || { echo "::error::Missing PROD_DOMAIN repo/environment variable"; exit 1; }
+          echo "VITE_POKER_WS_URL=wss://$PROD_DOMAIN/ws" > .env.production
           npm run build --if-present
           test -f dist/index.html || { echo "::error::client build missing dist/index.html"; exit 1; }
 
