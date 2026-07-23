@@ -87,11 +87,15 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.ACTIONS_DEPLOY_KNOWN_HOSTS }}
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
         run: |
           set -eu
           # 验证密钥和主机指纹非空
           test -n "$SSH_PRIVATE_KEY" || { echo "::error::Missing ACTIONS_DEPLOY_KEY"; exit 1; }
           test -n "$SSH_KNOWN_HOSTS" || { echo "::error::Missing ACTIONS_DEPLOY_KNOWN_HOSTS"; exit 1; }
+          test -n "$PROD_HOST" || { echo "::error::Missing PROD_HOST"; exit 1; }
+          test -n "$PROD_USER" || { echo "::error::Missing PROD_USER"; exit 1; }
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
