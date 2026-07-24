@@ -17,22 +17,22 @@
 
 /* 主桌面 —— 用于 PokerTable 的背景升级 */
 .felt-3d {
-  /* 基础绿色毡 */
+  /* 真实绿呢基底 */
   background:
-    /* 织物纹理：细微噪点 */
+    /* 呢绒纤维纹理 */
     repeating-conic-gradient(
-      rgba(0, 80, 40, 0.03) 0% 25%,
+      rgba(255, 215, 0, 0.06) 0% 25%,
       transparent 0% 50%
     ) 0 0 / 4px 4px,
-    /* 径向光晕（中心光源） */
+    /* 径向光晕（桌面中心高光） */
     radial-gradient(
       ellipse at 45% 40%,
-      rgba(40, 160, 80, 0.35) 0%,
-      rgba(10, 70, 40, 0.6) 40%,
-      rgba(2, 40, 20, 0.9) 75%,
-      rgba(1, 25, 12, 1) 100%
+      rgba(251, 191, 36, .28) 0%,
+      rgba(16, 185, 129, .22) 28%,
+      rgba(10, 61, 39, .85) 68%,
+      rgba(4, 29, 18, 1) 100%
     );
-  /* 叠加细微的布料纹理 */
+  /* 叠加金属光泽 */
   background-blend-mode: overlay, normal;
 }
 
@@ -41,8 +41,10 @@
   background:
     radial-gradient(
       ellipse at 50% 45%,
-      rgba(60, 180, 100, 0.08) 0%,
-      transparent 60%
+      rgba(251, 191, 36, 0.15) 0%,
+      rgba(16, 185, 129, 0.18) 28%,
+      rgba(10, 61, 39, 0.12) 60%,
+      transparent 70%
     );
   pointer-events: none;
 }
@@ -50,9 +52,9 @@
 /* 桌面边缘光晕（模拟厚度） */
 .felt-rim-glow {
   box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.5),
-    inset 0 -20px 40px rgba(0, 50, 20, 0.3),
-    0 8px 32px rgba(0, 0, 0, 0.4);
+    inset 0 0 80px rgba(251, 191, 36, .06),
+    inset 0 -20px 50px rgba(255, 215, 0, .1),
+    0 10px 40px rgba(0, 0, 0, .5);
 }
 
 /* 桌面反射高光（模拟漆面） */
@@ -60,12 +62,14 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.01) 30%,
-    transparent 50%
-  );
+  background:
+    linear-gradient(
+      160deg,
+      rgba(251, 191, 36, 0.12) 0%,
+      rgba(255, 255, 255, 0.03) 24%,
+      rgba(255, 215, 0, 0.06) 46%,
+      transparent 60%
+    );
   pointer-events: none;
 }
 
@@ -82,14 +86,14 @@
   z-index: 100;
 }
 
-/* 白色粒子 */
+/* 金色粒子 */
 .win-particle {
   position: absolute;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #e5e5e5;
-  box-shadow: 0 0 6px rgba(226, 232, 240, 0.35);
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, .5);
   animation: win-particle-fall var(--fall-duration, 2s) linear forwards;
   animation-delay: var(--fall-delay, 0s);
   will-change: transform, opacity;
@@ -116,7 +120,7 @@
   left: var(--beam-x, 50%);
   width: 4px;
   height: 0;
-  background: linear-gradient(to top, transparent, rgba(226, 232, 240, 0.5), transparent);
+  background: linear-gradient(to top, transparent, rgba(251, 191, 36, .5), transparent);
   animation: win-beam-rise 1.2s ease-out forwards;
   animation-delay: var(--beam-delay, 0s);
   transform-origin: bottom center;
@@ -141,7 +145,7 @@
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(226, 232, 240, 0.12), transparent 70%);
+  background: radial-gradient(circle, rgba(251, 191, 36, .18), transparent 70%);
   transform: translate(-50%, -50%);
   animation: win-glow-pulse 1.5s ease-in-out infinite alternate;
 }
@@ -160,19 +164,19 @@
 /* 胜利文字 */
 .win-title {
   position: absolute;
-  top: 35%;
+  top: 34%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 3rem;
   font-weight: 900;
-  color: #f5f5f4;
+  color: #fbbf24;
   text-shadow:
-    0 0 20px rgba(226, 232, 240, 0.5),
-    0 0 60px rgba(226, 232, 240, 0.25),
-    0 2px 4px rgba(0, 0, 0, 0.5);
+    0 0 16px rgba(251, 191, 36, .8),
+    0 0 56px rgba(251, 191, 36, .35),
+    0 2px 6px rgba(0, 0, 0, .7);
   animation: win-title-reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   opacity: 0;
-  letter-spacing: 0.1em;
+  letter-spacing: .12em;
   will-change: transform, opacity;
 }
 
@@ -197,8 +201,8 @@
   font-weight: 700;
   color: var(--color-text);
   text-shadow:
-    0 0 12px rgba(226, 232, 240, 0.35),
-    0 2px 4px rgba(0, 0, 0, 0.5);
+    0 0 12px rgba(251, 191, 36, .4),
+    0 2px 4px rgba(0, 0, 0, .6);
   animation: win-amount-appear 0.6s ease-out 0.4s forwards;
   opacity: 0;
   will-change: transform, opacity;
@@ -310,7 +314,7 @@
 
 /* 中性渐变文本 */
 .text-gold-gradient {
-  background: linear-gradient(135deg, #f5f5f4, #a3a3a3, #f5f5f4);
+  background: linear-gradient(135deg, #fbbf24, #d4a843, #fbbf24);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -319,12 +323,12 @@
 /* 发光边框动画 */
 @keyframes border-glow-pulse {
   0%, 100% {
-    border-color: rgba(148, 163, 184, 0.25);
-    box-shadow: 0 0 8px rgba(148, 163, 184, 0.08);
+    border-color: rgba(251, 191, 36, .22);
+    box-shadow: 0 0 8px rgba(251, 191, 36, .06);
   }
   50% {
-    border-color: rgba(148, 163, 184, 0.5);
-    box-shadow: 0 0 20px rgba(148, 163, 184, 0.15);
+    border-color: rgba(251, 191, 36, .5);
+    box-shadow: 0 0 20px rgba(251, 191, 36, .14);
   }
 }
 
@@ -361,9 +365,9 @@
 .shimmer {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.03) 25%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.03) 75%
+    rgba(251, 191, 36, 0.04) 25%,
+    rgba(251, 191, 36, 0.07) 50%,
+    rgba(251, 191, 36, 0.04) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;

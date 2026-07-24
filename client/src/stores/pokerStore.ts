@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { soundStore } from '../lib/sound'
+import { profileStore } from './profileStore'
 import type { Card, ClientPayload, SeatView, ServerEvent, ServerMsg } from '../types/protocol'
 
 export type ConnectionStatus = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING'
@@ -199,6 +200,9 @@ function reduce(event: ServerEvent, replaying = false): boolean {
         Object.entries(event.reveals).map(([id, cards]) => [id, cards.map(({ card }) => card)]),
       )
       setSeats(event.seats)
+      if (playerId.value && event.winnings[playerId.value] !== undefined) {
+        profileStore.recordHandResult(event.winnings[playerId.value] > 0, event.winnings[playerId.value])
+      }
       break
     case 'HAND_ENDED':
       state.street = 'COMPLETE'

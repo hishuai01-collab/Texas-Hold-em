@@ -17,7 +17,10 @@ function confirmSeat(): void {
 <template>
   <main class="ui-page seat-page">
     <section class="ui-panel seat-panel" aria-labelledby="seat-title">
-      <RouterLink class="back-link" :to="{ name: 'room-list' }">返回房间选择</RouterLink>
+      <RouterLink class="back-btn" :to="{ name: 'room-list' }">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+        <span>返回房间</span>
+      </RouterLink>
       <p class="eyebrow">德州扑克 / 房间确认</p>
       <h1 id="seat-title">确认坐下</h1>
 
@@ -43,8 +46,9 @@ function confirmSeat(): void {
 <style scoped>
 .seat-page { display: grid; min-height: 100dvh; place-items: center; padding: 24px; }
 .seat-panel { width: min(100%, 520px); padding: 32px; }
-.back-link { color: var(--color-text-muted); font-size: 12px; text-decoration: none; }
-.back-link:hover { color: var(--color-text); }
+.back-btn { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 12px; text-decoration: none; }
+.back-btn:hover { color: var(--color-text); }
+.back-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .eyebrow { margin: 28px 0 0; color: var(--color-text-muted); font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; letter-spacing: .16em; }
 h1 { margin: 12px 0 0; font-family: var(--font-display, sans-serif); font-size: 32px; line-height: 1.1; }
 

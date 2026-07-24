@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
     "@types/howler": "^2.2.13",
     "howler": "^2.2.4",
     "vue": "^3.5.39",

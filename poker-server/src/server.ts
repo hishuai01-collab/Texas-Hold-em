@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";

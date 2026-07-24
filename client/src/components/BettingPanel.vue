@@ -27,19 +27,19 @@ function submitRaise(): void {
     <section class="ui-panel p-4">
       <template v-if="request && seat && connected">
         <div class="mb-3 flex items-center justify-between text-sm">
-          <span class="font-semibold text-gray-200">轮到你行动</span>
-          <span class="text-gray-400">{{ request.toCall ? `跟注 ${request.toCall}` : '可过牌' }}</span>
+          <span class="font-semibold text-amber-200">轮到你行动</span>
+          <span class="text-amber-100/85">{{ request.toCall ? `跟注 ${request.toCall}` : '可过牌' }}</span>
         </div>
         <div class="grid grid-cols-3 gap-2">
           <button class="ui-button ui-button--danger" @click="emit('action', 'FOLD')">弃牌</button>
           <button v-if="request.toCall === 0" class="ui-button ui-button--neutral" @click="emit('action', 'CHECK')">过牌</button>
           <button v-else class="ui-button ui-button--neutral" @click="emit('action', 'CALL')">跟注 {{ request.toCall }}</button>
-          <button class="ui-button ui-button--danger" @click="emit('action', 'ALL_IN')">全下</button>
+          <button class="ui-button ui-button--danger" @click="emit('action', 'ALL_IN')">全押</button>
         </div>
-        <div class="mt-3 border-t border-gray-700/30 pt-3" :class="{ 'opacity-45': !canRaise }">
-          <div class="mb-1 flex justify-between text-xs text-gray-400"><span>加注到</span><strong class="text-gray-200">{{ raiseTo }}</strong></div>
-          <input v-model.number="raiseTo" class="w-full accent-gray-400" type="range" :min="request.minRaiseTo" :max="maxRaiseTo" :disabled="!canRaise" />
-          <div class="mt-1 flex justify-between text-[10px] text-gray-500"><span>最小 {{ request.minRaiseTo }}</span><span>最大 {{ maxRaiseTo }}</span></div>
+        <div class="mt-3 border-t border-amber-300/20 pt-3" :class="{ 'opacity-45': !canRaise }">
+          <div class="mb-1 flex justify-between text-xs text-amber-100/80"><span>加注到</span><strong class="text-amber-100">{{ raiseTo }}</strong></div>
+          <input v-model.number="raiseTo" class="w-full accent-amber-400" type="range" :min="request.minRaiseTo" :max="maxRaiseTo" :disabled="!canRaise" />
+          <div class="mt-1 flex justify-between text-[10px] text-gray-400"><span>最小 {{ request.minRaiseTo }}</span><span>最大 {{ maxRaiseTo }}</span></div>
           <button class="ui-button ui-button--primary mt-2 w-full" :disabled="!canRaise" @click="submitRaise">加注至 {{ raiseTo }}</button>
         </div>
       </template>

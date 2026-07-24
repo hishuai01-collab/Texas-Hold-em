@@ -12,7 +12,7 @@
 #   2. /etc/poker-server/env（生产环境）
 #   3. .env 文件（开发环境，不提交到仓库）
 
-set -euo pipefail
+set -eo pipefail
 
 # ── 颜色 ──
 RED='\033[0;31m'

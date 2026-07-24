@@ -5,6 +5,7 @@ import { privateTableService } from './PrivateTableService.js';
 import { TableManager } from './TableManager.js';
 import { UserService } from './UserService.js';
 import { ErrorCode } from '../domain/errors/ErrorCode.js';
+import { SupabaseAuthVerifier } from '../infrastructure/security/supabaseAuth.js';
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()) ?? ['*'];
 
@@ -60,6 +61,7 @@ export class HttpApiServer {
   private server = createServer((req, res) => this.handleRequest(req, res));
   private readonly userService?: UserService;
   private readonly tokenRedis?: Redis;
+  private readonly supabaseVerifier?: SupabaseAuthVerifier;
 
   constructor(private readonly deps: HttpApiDeps) {
     if (deps.redisUrl) {
@@ -69,6 +71,10 @@ export class HttpApiServer {
       } catch {
         this.tokenRedis = undefined;
       }
+    }
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET
+    if (jwtSecret) {
+      this.supabaseVerifier = new SupabaseAuthVerifier(jwtSecret)
     }
   }
 
@@ -102,6 +108,12 @@ export class HttpApiServer {
       // POST /api/v1/auth/login — 登录/注册并颁发访问令牌
       if (method === 'POST' && url === '/api/v1/auth/login') {
         await this.handleLogin(req, res);
+        return;
+      }
+
+      // POST /api/v1/auth/supabase — 用 Supabase JWT 换取内部会话令牌
+      if (method === 'POST' && url === '/api/v1/auth/supabase') {
+        await this.handleSupabaseLogin(req, res);
         return;
       }
 
@@ -350,6 +362,60 @@ export class HttpApiServer {
       return;
     }
     jsonResponse(res, 200, { id: user.id, name: user.name, balance: user.balance, createdAt: user.createdAt });
+  }
+
+  private async handleSupabaseLogin(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.supabaseVerifier) {
+      jsonResponse(res, 501, { error: ErrorCode.REDIS_UNAVAILABLE, message: 'Supabase 认证服务未配置', traceId: randomUUID() });
+      return;
+    }
+    let body: unknown;
+    try {
+      body = await parseBody(req);
+    } catch {
+      jsonResponse(res, 400, { error: ErrorCode.INVALID_JSON, message: '请求体必须是合法的 JSON', traceId: randomUUID() });
+      return;
+    }
+    const { access_token } = body as Record<string, unknown>;
+    const token = typeof access_token === 'string' && access_token.trim().length > 0 ? access_token.trim() : undefined;
+    if (!token) {
+      jsonResponse(res, 400, { error: ErrorCode.MISSING_FIELD, message: '缺少 access_token', traceId: randomUUID() });
+      return;
+    }
+    let identity;
+    try {
+      const verified = this.supabaseVerifier.verify(token);
+      identity = this.supabaseVerifier.extractIdentity(verified);
+    } catch (error) {
+      console.error('[HTTP API] supabase jwt verify failed', error);
+      jsonResponse(res, 401, { error: ErrorCode.INVALID_JSON, message: 'Supabase 令牌无效或已过期', traceId: randomUUID() });
+      return;
+    }
+    if (!this.userService) {
+      jsonResponse(res, 501, { error: ErrorCode.REDIS_UNAVAILABLE, message: '用户服务未配置', traceId: randomUUID() });
+      return;
+    }
+    try {
+      let user = await this.userService.getMe(identity.userId);
+      if (!user) {
+        user = await this.userService.register(identity.name, identity.userId);
+      }
+      if (!this.tokenRedis) {
+        jsonResponse(res, 200, { token: null, user: { id: user.id, name: user.name, balance: user.balance } });
+        return;
+      }
+      const sessionToken = randomUUID() + randomUUID().replaceAll('-', '');
+      const payload: AuthTokenPayload = {
+        userId: user.id,
+        name: user.name,
+        issuedAt: new Date().toISOString(),
+      };
+      await this.tokenRedis.set(AUTH_KEY(sessionToken), JSON.stringify(payload), 'EX', AUTH_TTL_SECONDS);
+      jsonResponse(res, 200, { token: sessionToken, user: payload });
+    } catch (error) {
+      console.error('[HTTP API] supabase login failed', error);
+      jsonResponse(res, 500, { error: ErrorCode.INTERNAL_ERROR, message: '登录失败', traceId: randomUUID() });
+    }
   }
 
   private async handleLogin(req: IncomingMessage, res: ServerResponse): Promise<void> {

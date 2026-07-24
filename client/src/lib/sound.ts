@@ -4,6 +4,8 @@ import { ref } from 'vue'
 export type PokerSound = 'deal' | 'check' | 'fold' | 'call' | 'raise' | 'win' | 'lose' | 'street'
 
 const mutedStorageKey = 'poker.sound.muted'
+const sfxVolumeKey = 'poker.sound.sfxVolume'
+const bgmVolumeKey = 'poker.sound.bgmVolume'
 
 function createWavDataUri(
   duration: number,
@@ -47,18 +49,25 @@ function createToneDataUri(frequency: number, duration = 0.09): string {
   })
 }
 
+function createClickDataUri(): string {
+  return createWavDataUri(0.04, 12_000, (time) => {
+    const envelope = Math.exp(-time * 55)
+    const tone = Math.sin(time * 1800 * Math.PI * 2) * 0.45 + Math.sin(time * 3600 * Math.PI * 2) * 0.25
+    return tone * envelope
+  })
+}
+
 function createAmbientDataUri(): string {
-  const duration = 6
-  return createWavDataUri(duration, 6_000, (time, progress) => {
-    // A quiet, seamless three-note pad; it is intentionally background texture,
-    // not a gameplay signal competing with the eight event sounds.
-    const edge = Math.min(1, progress * 14, (1 - progress) * 14)
-    const pulse = 0.74 + Math.sin(time * Math.PI * 2 / 3) * 0.12
+  const duration = 8
+  return createWavDataUri(duration, 8_000, (time, progress) => {
+    const edge = Math.min(1, progress * 12, (1 - progress) * 12)
+    const pulse = 0.74 + Math.sin(time * Math.PI * 2 / 4) * 0.1
     const chord =
-      Math.sin(time * 65.41 * Math.PI * 2) * 0.52
-      + Math.sin(time * 82.41 * Math.PI * 2) * 0.29
-      + Math.sin(time * 98 * Math.PI * 2) * 0.19
-    return chord * edge * pulse * 0.075
+      Math.sin(time * 65.41 * Math.PI * 2) * 0.48
+      + Math.sin(time * 82.41 * Math.PI * 2) * 0.26
+      + Math.sin(time * 98 * Math.PI * 2) * 0.18
+      + Math.sin(time * 130.81 * Math.PI * 2) * 0.12
+    return chord * edge * pulse * 0.055
   })
 }
 
@@ -74,15 +83,21 @@ const soundFrequencies: Record<PokerSound, number> = {
 }
 
 const muted = ref(typeof window === 'undefined' || localStorage.getItem(mutedStorageKey) !== 'false')
+const sfxVolume = ref(Number(localStorage.getItem(sfxVolumeKey)) || 0.22)
+const bgmVolume = ref(Number(localStorage.getItem(bgmVolumeKey)) || 0.18)
+
 const sounds = Object.fromEntries(
   Object.entries(soundFrequencies).map(([event, frequency]) => [
     event,
-    new Howl({ src: [createToneDataUri(frequency)], volume: 0.22, preload: true }),
+    new Howl({ src: [createToneDataUri(frequency)], volume: sfxVolume.value, preload: true }),
   ]),
 ) as Record<PokerSound, Howl>
+
+const clickSound = new Howl({ src: [createClickDataUri()], volume: 0.12, preload: true })
+
 const ambience = new Howl({
   src: [createAmbientDataUri()],
-  volume: 0.18,
+  volume: bgmVolume.value,
   loop: true,
   preload: true,
 })
@@ -92,20 +107,56 @@ Howler.mute(muted.value)
 function setMuted(nextMuted: boolean): void {
   muted.value = nextMuted
   Howler.mute(nextMuted)
-  if (nextMuted) {
-    ambience.stop()
-  } else if (!ambience.playing()) {
-    ambience.play()
-  }
   localStorage.setItem(mutedStorageKey, String(nextMuted))
+}
+
+function setSfxVolume(next: number): void {
+  sfxVolume.value = Math.max(0, Math.min(1, next))
+  localStorage.setItem(sfxVolumeKey, String(sfxVolume.value))
+}
+
+function setBgmVolume(next: number): void {
+  bgmVolume.value = Math.max(0, Math.min(1, next))
+  ambience.volume(bgmVolume.value)
+  localStorage.setItem(bgmVolumeKey, String(bgmVolume.value))
+}
+
+function startAmbience(): void {
+  if (muted.value || ambience.playing()) return
+  ambience.play()
+}
+
+function stopAmbience(): void {
+  ambience.stop()
+}
+
+function fadeAmbience(targetVolume: number, duration = 800): void {
+  if (!ambience.playing() && targetVolume > 0) {
+    ambience.volume(targetVolume)
+    startAmbience()
+    return
+  }
+  ambience.fade(ambience.volume(), targetVolume, duration)
+  if (targetVolume === 0) {
+    setTimeout(() => { if (ambience.volume() === 0) ambience.stop() }, duration + 50)
+  }
 }
 
 export const soundStore = {
   muted,
+  sfxVolume,
+  bgmVolume,
   setMuted,
+  setSfxVolume,
+  setBgmVolume,
   toggle: () => setMuted(!muted.value),
-  stopAmbience: () => ambience.stop(),
+  startAmbience,
+  stopAmbience,
+  fadeAmbience,
   play: (event: PokerSound) => {
     if (!muted.value) sounds[event].play()
+  },
+  playClick: () => {
+    if (!muted.value) clickSound.play()
   },
 }

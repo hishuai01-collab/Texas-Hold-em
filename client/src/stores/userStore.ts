@@ -1,5 +1,6 @@
 import { ApiError, api } from '../lib/api'
 import { sessionStore, type UserProfile } from './sessionStore'
+import { authHelpers as supabaseAuth } from '../lib/supabase'
 
 interface UserMeResponse {
   id?: string | number
@@ -51,18 +52,10 @@ async function loadMe(): Promise<void> {
   }
 }
 
-/** The server issues a seven-day Bearer token persisted for the returning player. */
-async function login(name: string, userId?: string): Promise<void> {
+async function loginWithSupabase(): Promise<void> {
   sessionStore.beginAuthentication()
   try {
-    const payload = await api.post<LoginResponse>('/api/v1/auth/login', {
-      name,
-      ...(userId ? { userId } : {}),
-    })
-    if (!payload.token) throw new Error('登录服务未返回访问令牌')
-    sessionStore.setToken(payload.token)
-    const profile = await api.get<UserMeResponse>('/api/v1/user/me')
-    sessionStore.setUser(parseProfile(profile))
+    await supabaseAuth.restoreSupabaseSession()
   } catch (error) {
     sessionStore.clear()
     throw error
@@ -72,5 +65,10 @@ async function login(name: string, userId?: string): Promise<void> {
 export const userStore = {
   ...sessionStore,
   loadMe,
-  login,
+  sendPhoneOtp: supabaseAuth.sendPhoneOtp,
+  verifyPhoneOtp: supabaseAuth.verifyPhoneOtp,
+  sendEmailOtp: supabaseAuth.sendEmailOtp,
+  verifyEmailOtp: supabaseAuth.verifyEmailOtp,
+  loginWithOAuth: supabaseAuth.signInWithOAuth,
+  loginWithSupabase,
 }
