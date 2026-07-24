@@ -11,15 +11,6 @@ interface UserMeResponse {
   data?: UserMeResponse
 }
 
-interface LoginResponse {
-  token: string | null
-  user: {
-    id?: string | number
-    userId?: string | number
-    name?: string
-  }
-}
-
 function parseProfile(payload: UserMeResponse): UserProfile {
   const source = payload.data ?? payload
   const balance = Number(source.balance)

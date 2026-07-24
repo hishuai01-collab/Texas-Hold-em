@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import PlatformTabBar from '../components/PlatformTabBar.vue'
 import { soundStore } from '../lib/sound'
 import { themeStore } from '../stores/themeStore'
 
@@ -84,6 +83,10 @@ function setVolume(key: string, value: number): void {
 function clearCache(): void {
   localStorage.clear()
   window.location.reload()
+}
+
+function alert(msg: string): void {
+  window.alert(msg)
 }
 
 function goBack(): void {
@@ -307,21 +310,21 @@ const fontSizeLabel = computed(() => {
     <section class="settings-section" aria-label="账号安全">
       <h2 class="settings-section__title">🔒 账号安全</h2>
       <div class="settings-list">
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('修改密码功能尚未接入')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('修改密码功能尚未接入')">
           <div class="setting-info">
             <span class="setting-label">修改密码</span>
             <span class="setting-desc">定期更换密码保护账户</span>
           </div>
           <span class="menu-item__arrow">&rarr;</span>
         </button>
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('绑定手机功能尚未接入')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('绑定手机功能尚未接入')">
           <div class="setting-info">
             <span class="setting-label">绑定手机</span>
             <span class="setting-desc">增强账号安全与找回</span>
           </div>
           <span class="menu-item__arrow">&rarr;</span>
         </button>
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('登录设备功能尚未接入')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('登录设备功能尚未接入')">
           <div class="setting-info">
             <span class="setting-label">登录设备</span>
             <span class="setting-desc">查看与管理已登录设备</span>
@@ -342,7 +345,7 @@ const fontSizeLabel = computed(() => {
           </div>
           <span class="menu-item__arrow">&rarr;</span>
         </button>
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('导出数据功能尚未接入')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('导出数据功能尚未接入')">
           <div class="setting-info">
             <span class="setting-label">导出数据</span>
             <span class="setting-desc">导出游戏历史记录</span>
@@ -356,14 +359,14 @@ const fontSizeLabel = computed(() => {
     <section class="settings-section" aria-label="关于">
       <h2 class="settings-section__title">ℹ️ 关于</h2>
       <div class="settings-list">
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('帮助中心正在建设中')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('帮助中心正在建设中')">
           <div class="setting-info">
             <span class="setting-label">帮助中心</span>
             <span class="setting-desc">常见问题与客服</span>
           </div>
           <span class="menu-item__arrow">&rarr;</span>
         </button>
-        <button class="setting-row setting-row--link" type="button" @click="() => alert('用户协议页面正在建设中')">
+        <button class="setting-row setting-row--link" type="button" @click="alert('用户协议页面正在建设中')">
           <div class="setting-info">
             <span class="setting-label">用户协议</span>
             <span class="setting-desc">查看服务条款与隐私政策</span>
@@ -373,7 +376,6 @@ const fontSizeLabel = computed(() => {
       </div>
     </section>
 
-    <PlatformTabBar />
   </main>
 </template>
 

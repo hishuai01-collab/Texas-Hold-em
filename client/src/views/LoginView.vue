@@ -13,6 +13,9 @@ const otp = ref('')
 const email = ref('')
 const nextRoute = computed(() => typeof route.query.next === 'string' ? route.query.next : '/app/home')
 
+/** 支持的 OAuth Provider — 去除 wechat，WeChat 作为自定义流程处理 */
+type SocialProvider = 'google' | 'github'
+
 watch(
   () => userStore.status.value,
   (status) => {
@@ -74,10 +77,14 @@ async function confirmOtp(): Promise<void> {
   }
 }
 
-async function socialLogin(provider: 'wechat' | 'google' | 'github'): Promise<void> {
+async function socialLogin(provider: SocialProvider | 'wechat'): Promise<void> {
   submitting.value = true
   errorMessage.value = ''
   try {
+    if (provider === 'wechat') {
+      errorMessage.value = '微信登录暂未开放，请使用其他方式登录'
+      return
+    }
     await userStore.loginWithOAuth(provider)
   } catch {
     errorMessage.value = '登录失败，请稍后重试'

@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import BettingPanel from "../components/BettingPanel.vue";
-import PlatformTabBar from "../components/PlatformTabBar.vue";
 import PokerTable from "../components/PokerTable.vue";
 import WinCelebration from "../components/WinCelebration.vue";
 import { pokerStore } from "../stores/pokerStore";

@@ -1,6 +1,6 @@
-import { createClient, type Session, type User, type AuthError, type Provider } from '@supabase/supabase-js'
+import { createClient, type Session, type User, AuthError, type Provider } from '@supabase/supabase-js'
 import { sessionStore } from '../stores/sessionStore'
-import { api, ApiError } from '../lib/api'
+import { api } from '../lib/api'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -34,12 +34,12 @@ async function getBackendSession(accessToken: string): Promise<void> {
 
 export async function sendPhoneOtp(phone: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({ phone })
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
 }
 
 export async function verifyPhoneOtp(phone: string, token: string): Promise<void> {
   const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
   if (data.session?.access_token) {
     await getBackendSession(data.session.access_token)
   }
@@ -47,12 +47,12 @@ export async function verifyPhoneOtp(phone: string, token: string): Promise<void
 
 export async function sendEmailOtp(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({ email })
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
 }
 
 export async function verifyEmailOtp(email: string, token: string): Promise<void> {
   const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
   if (data.session?.access_token) {
     await getBackendSession(data.session.access_token)
   }
@@ -65,7 +65,7 @@ export async function signInWithOAuth(provider: Provider): Promise<void> {
       redirectTo: window.location.origin + '/app',
     },
   })
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
 }
 
 export async function restoreSupabaseSession(): Promise<void> {
@@ -78,7 +78,7 @@ export async function restoreSupabaseSession(): Promise<void> {
 
 export async function supabaseSignOut(): Promise<void> {
   const { error } = await supabase.auth.signOut()
-  if (error) throw new AuthError(error.message, error.status, error)
+  if (error) throw new AuthError(error.message, error.status)
   sessionStore.clear()
 }
 
