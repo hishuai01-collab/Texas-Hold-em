@@ -1,0 +1,35 @@
+{
+  "name": "texas-hold-em-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Texas Hold'em Poker Platform - Monorepo root",
+  "workspaces": [
+    "client",
+    "poker-server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd poker-server && npm run dev",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd poker-server && npm run build",
+    "start": "npm run start:server",
+    "start:server": "cd poker-server && npm run start",
+    "preview": "cd client && npm run preview",
+    "test": "npm run test:server",
+    "test:server": "cd poker-server && npm run test",
+    "test:e2e": "cd poker-server && npm run test:e2e",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd poker-server && npm run lint",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "husky": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
