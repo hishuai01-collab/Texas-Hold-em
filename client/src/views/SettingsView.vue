@@ -14,7 +14,7 @@ const presets = themeStore.presets
 
 const themeMode = computed({
   get: () => config.value.mode,
-  set: (v: 'dark' | 'light' | 'system') => themeStore.setMode(v),
+  set: (v: 'dark' | 'light' | 'platinum' | 'system') => themeStore.setMode(v),
 })
 
 const fontSize = computed({
@@ -159,7 +159,7 @@ const fontSizeLabel = computed(() => {
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">显示模式</span>
-            <span class="setting-desc">深色 / 浅色 / 跟随系统</span>
+            <span class="setting-desc">深色 / 浅色 / 白金 / 跟随系统</span>
           </div>
           <div class="mode-selector">
             <button
@@ -179,6 +179,15 @@ const fontSizeLabel = computed(() => {
             >
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
               <span>浅色</span>
+            </button>
+            <button
+              type="button"
+              class="mode-btn"
+              :class="{ 'mode-btn--active': themeMode === 'platinum' }"
+              @click="themeMode = 'platinum'"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="4" /></svg>
+              <span>白金</span>
             </button>
             <button
               type="button"
@@ -437,7 +446,7 @@ const fontSizeLabel = computed(() => {
 .toggle { position: relative; width: 48px; height: 28px; border-radius: var(--radius-pill); border: 1px solid var(--color-border); background: var(--color-surface-raised); cursor: pointer; transition: background 180ms ease, border-color 180ms ease; flex-shrink: 0; }
 .toggle--on { background: var(--color-amber); border-color: var(--color-amber); }
 .toggle__thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-text); box-shadow: var(--shadow-panel); transition: transform 180ms ease; }
-.toggle--on .toggle__thumb { transform: translateX(20px); background: #ffffff; }
+.toggle--on .toggle__thumb { transform: translateX(20px); background: var(--color-amber); }
 
 /* ── 音量滑块 ── */
 .volume-slider { width: 120px; accent-color: var(--color-amber); cursor: pointer; }

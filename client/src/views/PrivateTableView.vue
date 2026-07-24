@@ -141,7 +141,7 @@ onUnmounted(pokerStore.disconnect);
           <p class="mt-3 text-xs font-bold tracking-[.28em] text-amber-300">
             私人牌桌
           </p>
-          <h1 class="mt-1 text-xl font-black tracking-wide text-white">
+          <h1 class="mt-1 text-xl font-black tracking-wide" style="color: var(--color-text);">
             {{ displayName }}
           </h1>
           <p class="mt-1 text-xs text-gray-400">

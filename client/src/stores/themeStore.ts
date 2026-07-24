@@ -33,8 +33,8 @@ export interface ThemePreset {
 
 export interface ThemeConfig {
   presetId: string
-  mode: 'dark' | 'light' | 'system'
-  fontSize: number       // 0.8 ~ 1.4
+  mode: 'dark' | 'light' | 'platinum' | 'system'
+  fontSize: number
   reducedMotion: boolean
   highContrast: boolean
 }
@@ -146,6 +146,32 @@ const PRESETS: ThemePreset[] = [
       canvas: '#000000',
     },
   },
+  {
+    id: 'platinum',
+    name: '白金',
+    desc: '清冷的白蓝配色，优雅简洁',
+    icon: '💎',
+    colors: {
+      felt: '#1a6b8a',
+      feltDark: '#0d4a62',
+      feltLight: '#2a8aaa',
+      cardBack: '#1e3a5c',
+      cardBackPattern: '#2a5a8c',
+      chipPrimary: '#3b82f6',
+      chipSecondary: '#60a5fa',
+      accent: '#3b82f6',
+      accentDark: '#2563eb',
+      wood: '#2d4a5c',
+      woodDark: '#1a3040',
+      surface: '#f0f4f8',
+      surfaceRaised: '#e2e8f0',
+      border: '#cbd5e1',
+      borderStrong: '#94a3b8',
+      text: '#0f172a',
+      textMuted: '#475569',
+      canvas: '#f8fafc',
+    },
+  },
 ]
 
 /* ── Light 模式颜色映射（基于当前 preset 自动计算） ── */
@@ -181,6 +207,29 @@ function generateLightColors(preset: ThemePreset): ThemeColors {
   }
 }
 
+function generatePlatinumColors(preset: ThemePreset): ThemeColors {
+  return {
+    felt: '#1a6b8a',
+    feltDark: '#0d4a62',
+    feltLight: '#2a8aaa',
+    cardBack: '#1e3a5c',
+    cardBackPattern: '#2a5a8c',
+    chipPrimary: '#3b82f6',
+    chipSecondary: '#60a5fa',
+    accent: '#3b82f6',
+    accentDark: '#2563eb',
+    wood: '#2d4a5c',
+    woodDark: '#1a3040',
+    surface: '#f0f4f8',
+    surfaceRaised: '#e2e8f0',
+    border: '#cbd5e1',
+    borderStrong: '#94a3b8',
+    text: '#0f172a',
+    textMuted: '#475569',
+    canvas: '#f8fafc',
+  }
+}
+
 /* ── Store ── */
 
 const STORAGE_KEY = 'poker.theme.v2'
@@ -211,22 +260,24 @@ const currentPreset = ref<ThemePreset>(getPreset(config.value.presetId))
 let systemDarkMedia: MediaQueryList | null = null
 let systemListener: (() => void) | null = null
 
-function getEffectiveMode(): 'dark' | 'light' {
-  if (config.value.mode === 'system') {
-    return systemDarkMedia?.matches ? 'dark' : 'light'
-  }
-  return config.value.mode
-}
+function getEffectiveMode(): 'dark' | 'light' | 'platinum' {
+   if (config.value.mode === 'system') {
+     return systemDarkMedia?.matches ? 'dark' : 'light'
+   }
+   return config.value.mode
+ }
 
-function applyTheme(): void {
-  const preset = currentPreset.value
-  const isDark = getEffectiveMode() === 'dark'
-  const colors = isDark ? preset.colors : generateLightColors(preset)
+ function applyTheme(): void {
+   const preset = currentPreset.value
+   const mode = getEffectiveMode()
+   const isDark = mode === 'dark'
+   const isPlatinum = mode === 'platinum'
+   const colors = isDark ? preset.colors : (isPlatinum ? generatePlatinumColors(preset) : generateLightColors(preset))
 
-  const root = document.documentElement
-  root.dataset.theme = isDark ? 'dark' : 'light'
-  root.dataset.preset = preset.id
-  root.dataset.highContrast = config.value.highContrast ? 'true' : 'false'
+   const root = document.documentElement
+   root.dataset.theme = isPlatinum ? 'platinum' : (isDark ? 'dark' : 'light')
+   root.dataset.preset = preset.id
+   root.dataset.highContrast = config.value.highContrast ? 'true' : 'false'
 
   // 字体缩放
   root.style.fontSize = `${config.value.fontSize * 100}%`
@@ -297,7 +348,7 @@ export const themeStore = {
   },
 
   /** 设置深浅模式 */
-  setMode(mode: 'dark' | 'light' | 'system'): void {
+  setMode(mode: 'dark' | 'light' | 'platinum' | 'system'): void {
     config.value.mode = mode
     if (mode === 'system') {
       startSystemThemeListener()

@@ -344,6 +344,8 @@ function goBack(): void {
 .hub-noise { position: absolute; z-index: -1; inset: 0; opacity: .45; background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-text) 3%, transparent) 1px, transparent 1px), linear-gradient(color-mix(in srgb, var(--color-text) 3%, transparent) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at center, black, transparent 74%); }
 .hub-bg { position: absolute; inset: 0; z-index: -2; background-image: url('/hero-bg.jpg'); background-size: cover; background-position: center; }
 .hub-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.62), rgba(0,0,0,0.78)); }
+[data-theme="platinum"] .hub-bg { background: linear-gradient(135deg, #e0e7ff 0%, #f0f4ff 50%, #e8f0fe 100%); }
+[data-theme="platinum"] .hub-bg::after { background: linear-gradient(to bottom, rgba(255,255,255,.35), rgba(255,255,255,.55)); }
 .hub-header, .hero, .game-section, .flow-section, .ad-carousel, .advantages-section, .fairness-section { width: min(100%, 1120px); margin-inline: auto; }
 .hub-header { display: flex; align-items: center; justify-content: space-between; min-height: 56px; }
 .brand { color: var(--color-text); font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: .16em; text-decoration: none; }
@@ -353,9 +355,9 @@ function goBack(): void {
 /* 动态广告轮播 */
 .ad-carousel { position: relative; margin-top: 24px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-float); }
 .ad-carousel__inner { position: relative; width: 100%; height: 180px; }
-.ad-carousel__slide { position: absolute; inset: 0; display: flex; align-items: center; padding: 32px 40px; color: #ffffff; }
+.ad-carousel__slide { position: absolute; inset: 0; display: flex; align-items: center; padding: 32px 40px; color: var(--color-text); }
 .ad-carousel__content { position: relative; z-index: 1; max-width: 600px; }
-.ad-carousel__badge { display: inline-block; padding: 6px 14px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(8px); border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; margin-bottom: 12px; }
+.ad-carousel__badge { display: inline-block; padding: 6px 14px; background: color-mix(in srgb, var(--color-surface) 80%, transparent); backdrop-filter: blur(8px); border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; margin-bottom: 12px; }
 .ad-carousel__title { margin: 0; font-family: var(--font-display); font-size: 32px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
 .ad-carousel__subtitle { margin: 8px 0 0; font-size: 18px; font-weight: 600; opacity: .95; }
 .ad-carousel__description { margin: 6px 0 0; font-size: 14px; opacity: .85; line-height: 1.5; }
@@ -395,7 +397,7 @@ h2 { font-size: 30px; line-height: 1.08; }
 .hero-meta span { border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 8px 10px; color: var(--color-text-muted); font-family: var(--font-mono); font-size: 11px; }
 .hero-tableau { position: relative; min-height: 332px; border: 1px solid var(--color-border); border-radius: 48% 48% var(--radius-lg) var(--radius-lg); background: radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--color-text-muted) 7%, var(--color-surface-raised)), var(--color-surface) 68%); box-shadow: var(--shadow-float); transform: perspective(1000px) rotateX(8deg) rotateZ(-4deg); }
 .tableau-ring { position: absolute; inset: 13%; border: 1px solid color-mix(in srgb, var(--color-text-muted) 40%, transparent); border-radius: 50%; }
-.tableau-card { position: absolute; display: grid; place-items: center; width: 74px; height: 108px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: linear-gradient(135deg, #ffffff 0%, #f5f5f4 100%); box-shadow: var(--shadow-panel); color: var(--color-canvas); font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: .8; }
+.tableau-card { position: absolute; display: grid; place-items: center; width: 74px; height: 108px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-raised) 100%); box-shadow: var(--shadow-panel); color: var(--color-text); font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: .8; }
 .tableau-card span { font-size: 20px; }
 .tableau-card--one { left: 20%; top: 30%; transform: rotate(-17deg); }
 .tableau-card--two { left: 42%; top: 21%; transform: rotate(2deg); }
