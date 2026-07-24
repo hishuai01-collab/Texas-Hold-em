@@ -26,7 +26,6 @@ import {
   PokerMetrics,
   startMetricsServer,
 } from "./infrastructure/observability/PrometheusMetrics.js";
-import { TelegramNotifier } from "./infrastructure/observability/TelegramNotifier.js";
 import {
   TelegramAdminBot,
   type AdminBotDependencies,

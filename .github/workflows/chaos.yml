@@ -53,10 +53,12 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: poker-server/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install server deps
-        working-directory: poker-server
+      # npm workspaces: 必须在仓库根目录跑一次 npm ci 把所有 workspace 的依赖装齐；
+      # 在子目录里跑 npm ci 只会装该 workspace 自己的依赖，装不出根目录的
+      # devDependencies（如 husky）、也装不出该 workspace 自己 bin（如 tsx/tsc）的软链。
+      - name: Install workspace dependencies
         run: npm ci
 
       # 门禁前置：先确认服务器能编译，避免混沌测试因编译错误产生误导性的“恢复失败”。

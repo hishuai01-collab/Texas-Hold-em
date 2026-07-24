@@ -129,7 +129,7 @@ export class TelegramAdminBot {
       return;
     }
 
-    let reply = '';
+    let reply: string;
     switch (cmd) {
       case '/status':
         reply = this.formatStatus();

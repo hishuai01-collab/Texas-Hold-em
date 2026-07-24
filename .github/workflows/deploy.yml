@@ -37,14 +37,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: |
-            poker-server/package-lock.json
-            client/package-lock.json
+          cache-dependency-path: package-lock.json
+
+      # npm workspaces: 必须在仓库根目录跑一次 npm ci 把所有 workspace 的依赖装齐；
+      # 在子目录里跑 npm ci 只会装该 workspace 自己的依赖，装不出根目录的
+      # devDependencies（如 husky）、也装不出该 workspace 自己 bin（如 tsx/tsc）的软链。
+      - name: Install workspace dependencies
+        run: npm ci
 
       - name: Test & build server
         working-directory: poker-server
         run: |
-          npm ci
           npm run test
           npm run build --if-present
           test -f dist/server.js || { echo "::error::server build missing dist/server.js"; exit 1; }
@@ -54,11 +57,23 @@ jobs:
         env:
           PROD_DOMAIN: ${{ vars.PROD_DOMAIN }}
         run: |
-          npm ci
           test -n "$PROD_DOMAIN" || { echo "::error::Missing PROD_DOMAIN repo/environment variable"; exit 1; }
           echo "VITE_POKER_WS_URL=wss://$PROD_DOMAIN/ws" > .env.production
           npm run build --if-present
           test -f dist/index.html || { echo "::error::client build missing dist/index.html"; exit 1; }
+
+      # poker-server/package-lock.json 脱离 workspaces、专给生产机 npm ci --omit=dev 用；
+      # workspaces 下正常 npm install 只更新根锁文件，不会同步这份独立锁文件，容易漂移到
+      # 和 package.json 对不上、生产部署时 npm ci 报错。这里每次构建都在隔离目录里现场
+      # 重新生成一份，保证上传的锁文件始终和 poker-server/package.json 一致。
+      - name: Regenerate standalone poker-server lockfile
+        run: |
+          set -eu
+          rm -rf /tmp/poker-server-lock
+          mkdir -p /tmp/poker-server-lock
+          cp poker-server/package.json /tmp/poker-server-lock/package.json
+          (cd /tmp/poker-server-lock && npm install --package-lock-only --legacy-peer-deps)
+          cp /tmp/poker-server-lock/package-lock.json poker-server/package-lock.json
 
       # 仅传递编译产物与运行所需清单，避免源码/测试进入服务器
       - name: Upload build artifacts
@@ -154,7 +169,11 @@ jobs:
             export REDIS_URL
 
             cd '"$REMOTE_DIR"'
-            npm ci --omit=dev
+            # --legacy-peer-deps: poker-server 的 devDependencies 里 typescript@7 与
+            # typescript-eslint 的 peer range(<6.1) 还没对上（生态还没跟上 TS7），
+            # 生产环境用 --omit=dev 本来就不会装这些 devDependencies，只是
+            # npm ci 仍会校验 package.json/lockfile 的 peer 一致性，加这个 flag 放行。
+            npm ci --omit=dev --legacy-peer-deps
 
             # 日志轮转预检：缺失才安装，安装或加载失败即中止部署。
             command -v pm2 >/dev/null 2>&1 || { echo "::error::pm2 is not installed"; exit 1; }

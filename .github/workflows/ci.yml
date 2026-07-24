@@ -30,24 +30,25 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            poker-server/package-lock.json
-            client/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install & test server
+      # npm workspaces: 必须在仓库根目录跑一次 npm ci 把所有 workspace 的依赖装齐；
+      # 在子目录里跑 npm ci 只会装该 workspace 自己的依赖，装不出根目录的
+      # devDependencies（如 husky）、也装不出该 workspace 自己 bin（如 tsx/tsc）的软链。
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Test & build server
         working-directory: poker-server
         env:
           REDIS_URL: redis://127.0.0.1:6379
         run: |
-          npm ci
           npm run test
           npm run build
 
       - name: Build client
         working-directory: client
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Run E2E flow test (requires Redis)
         working-directory: poker-server

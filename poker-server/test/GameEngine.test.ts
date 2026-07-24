@@ -121,7 +121,7 @@ test('事件重放：仅返回 seq 之后的事件', () => {
   engine.addPlayer('B', 'B', randomBytes(8).toString('hex'));
   engine.startHand();
 
-  let action = (() => {
+  const action = (() => {
     const b = emitMap.get('broadcast') ?? [];
     return b.filter(m => m.type === 'ACTION_REQUIRED').pop();
   })();

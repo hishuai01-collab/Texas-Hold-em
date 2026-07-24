@@ -67,7 +67,7 @@ export class HttpApiServer {
     if (deps.redisUrl) {
       this.userService = new UserService({ redisUrl: deps.redisUrl });
       try {
-        this.tokenRedis = new (require('ioredis').default)(deps.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 2 });
+        this.tokenRedis = new Redis(deps.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 2 });
       } catch {
         this.tokenRedis = undefined;
       }
